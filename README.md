@@ -10,7 +10,7 @@ In the root directory `run.py` simply initiates the GOD object which then runs t
 - Regulator oversees the exchanges and submits both up-to-date and lagged national best bid and offer (NBBO) information.
 - Trader is a basis class for all trader objects, it contains attributes and methods used by all traders.
 - ZeroIntelligence is a dummy trader, who trades the underlying asset according to his private and public valuation.
-=======
+
 The code simulates behaviour of zero-intelligence traders, market makers and an infinitely-fast arbitrageur under standard continuous trading and newly proposed (Budish et al. 2015) batch auctions market.
 
 The code is under development, at this point I decided to track my progress via GitHub, in no way does it represent a reproducible research.
