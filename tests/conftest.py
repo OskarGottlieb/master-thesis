@@ -87,9 +87,8 @@ def basic_asset() -> modules.asset.Asset:
 @pytest.fixture
 def basic_regulator(basic_asset):
 	return modules.regulator.Regulator(
-		NBBO_delay = settings.NBBO_DELAY,
+		national_best_bid_and_offer_delay = settings.NATIONAL_BEST_BID_AND_OFFER_DELAY,
 		asset = basic_asset,
-		list_exchanges = []
 	)
 
 
@@ -101,8 +100,9 @@ def basic_zerointelligence(basic_regulator, empty_orderbook):
 		shading_min = settings.SHADING_MIN,
 		shading_max = settings.SHADING_MAX,
 		regulator = basic_regulator,
-		default_exchange = empty_orderbook,
+		default_exchange = settings.NAMES_OF_EXCHANGES[0],
 	)
+
 
 @pytest.fixture(scope = 'session')
 def best_bid() -> Dict[Any, Any]:

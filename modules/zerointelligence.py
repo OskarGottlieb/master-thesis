@@ -16,7 +16,7 @@ class ZeroIntelligence(modules.trader.Trader):
 	ZeroIntelligence arrive according to a Poisson process and trade randomly.
 	'''
 	def __init__(self, idx: int, quantity_max: int, shading_min: int, shading_max: int,
-	default_exchange = orderbook.orderbook.NonUniqueIdOrderBook, *args, **kwargs) -> None:
+	default_exchange: str, *args, **kwargs) -> None:
 		super(ZeroIntelligence, self).__init__(*args, **kwargs)
 		self._idx = idx
 		self.quantity_max = quantity_max
@@ -26,7 +26,7 @@ class ZeroIntelligence(modules.trader.Trader):
 		self.side: int = None
 		self.shading_min: int = shading_min
 		self.shading_max: int = shading_max
-		self._default_exchange = default_exchange
+		self.default_exchange = default_exchange
 
 
 	def __str__(self):
@@ -37,13 +37,13 @@ class ZeroIntelligence(modules.trader.Trader):
 		return self._idx < other._idx
 
 
-	def get_public_utility_of_the_asset(self, timestamp: float) -> decimal.Decimal:
+	def get_public_utility_of_the_asset(self) -> decimal.Decimal:
 		'''
 		Represents equation (1), slightly rewritten.
 		'''
 		mean_price = self.regulator.asset.mean_price
 		return mean_price + (self.regulator.asset.latest_price - mean_price) * \
-		(1 - settings.MEAN_REVERSION_FACTOR) ** (settings.SESSION_LENGTH - timestamp)
+		(1 - settings.MEAN_REVERSION_FACTOR) ** (settings.SESSION_LENGTH - self.regulator.current_time)
 
 
 	def generate_private_component_gain(self) -> List[float]:
@@ -80,7 +80,7 @@ class ZeroIntelligence(modules.trader.Trader):
 		self.side = np.random.binomial(1, 0.5)
 
 
-	def trade(self, timestamp: float):
+	def trade(self):
 		'''
 		The trade function is called every time a trader enters the market according to his poisson process.
 		It starts off by calling the asset function which adds a new price into the list of asset's prices.
@@ -93,37 +93,101 @@ class ZeroIntelligence(modules.trader.Trader):
 		self.regulator.asset.get_new_price()
 		self.decide_direction()
 		order_price = int(
-			self.get_public_utility_of_the_asset(timestamp) + 
+			self.get_public_utility_of_the_asset() + 
 			self.get_private_utility_of_the_asset() +
 			self.generate_offset()
 		)
-		self.delete_order()
-		return self.send_order(order_price, timestamp)
+		if self.current_order:
+			self.delete_order_from_an_exchange(
+				exchange_name = self.current_order.exchange_name,
+				exchanges = self.regulator.exchanges
+			)
+		
+		exchange_name, order_price = self.decide_what_exchange_and_price_to_choose(
+			exchange_name = self.default_exchange,
+			order_price = order_price
+		)
+		action, price = self.process_response_from_exchange(
+			exchange_name = exchange_name,
+			order_price = order_price
+		)
+		return self.send_order(
+			exchange_name = exchange_name,
+			action = action,
+			price = price
+		)
 
 
-	def send_order(self, order_price: int, timestamp: float) -> Optional[int]:
+	def get_national_best_bid_and_offer(self) -> str:
+		'''
+		Returns the latest orderbook snapshot, which is stored in the Regulator's historic_exchanges_list.
+		'''
+		return self.get_accurate_national_best_bid_and_offer(
+			exchanges = self.regulator.historic_exchanges_list[-1].exchanges,
+			current_order = self.current_order,
+		)
+
+
+	def decide_what_exchange_and_price_to_choose(self, exchange_name: str, order_price: int):
+		'''
+		By default the trader sends his order to the exchange which was assigned to him on initializaiton.
+		This function then returns the exchange and price at which the trader is willing to trade, it does not alter
+		the direction (long/short) that the trade wants to trade in.
+		'''
+		side_type = modules.misc.side_to_orderbook_type(not self.side)
+		exchanges = self.regulator.historic_exchanges_list[-1].exchanges
+		exchange_name = self.default_exchange
+		national_best_bid_and_offer = self.get_national_best_bid_and_offer()
+		
+		# The default exchange does not have to have orders on one side, that is when the OrderSideEmpty exceptions
+		# is triggered and instead best_price is the best bid (ask) in case the trader is a seller (buyer).
+		try:
+			best_price = exchanges[exchange_name].get_side(side_type).get_best().price
+		except orderbook.exceptions.OrderSideEmpty:
+			best_price = national_best_bid_and_offer.ask if self.side else national_best_bid_and_offer.bid
+
+		if best_price:
+			if self.side and national_best_bid_and_offer.ask:
+				if order_price >= national_best_bid_and_offer.ask and national_best_bid_and_offer.ask <= best_price:
+					exchange_name = national_best_bid_and_offer.ask_exchange
+					order_price = national_best_bid_and_offer.ask
+			elif not self.side and national_best_bid_and_offer.bid:
+				if order_price <= national_best_bid_and_offer.bid and national_best_bid_and_offer.bid >= best_price:
+					exchange_name = national_best_bid_and_offer.bid_exchange
+					order_price = national_best_bid_and_offer.bid
+		return (exchange_name, order_price)
+
+
+	def process_response_from_exchange(self, exchange_name:str, order_price: int) -> None:
+		'''
+		We get back the info from the exchange (wrapped by the Regulator object), saying whether our order was executed or added to the orderbook.
+		It is also possible that the price updates (if there is a better order in the market).
+		'''
+		return self.regulator.process_order(
+			side = self.side,
+			order_price = order_price,
+			exchange_name = exchange_name,
+		)
+
+
+	def send_order(self, exchange_name: str, action:str, price: int) -> Optional[int]:
 		'''
 		The information about the trader's intention (buying/selling at which price) is sent to the regulator and processed.
 		Regulator knows of the (delayed) NBBO and therefore returns the exchange, action (adding a limit order or executing a
 		resting order). If the trade is executed, the function returns the ID of the trader whose order has been executed.
 		'''
-		exchange, action, price = self.regulator.process_order(
-			side = self.side,
-			order_price = order_price,
-			timestamp = timestamp,
-			default_exchange = self._default_exchange,
-		)
+		self.current_order = None
 		if action == 'A':
-			seconds, nanoseconds = math.modf(timestamp)
+			nanoseconds, seconds = math.modf(self.regulator.current_time)
 			self.add_limit_order(
 				price = price, 
 				seconds = seconds,
 				nanoseconds = nanoseconds,
-				exchange = exchange
+				exchange_name = exchange_name
 			)
 		else:
 			return self.execute_order(
-				exchange = exchange
+				exchange_name = exchange_name
 			)
 		return None
 

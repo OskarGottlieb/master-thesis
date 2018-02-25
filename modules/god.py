@@ -1,4 +1,5 @@
 from typing import List
+import itertools
 import random
 import numpy as np
 import pandas as pd
@@ -17,20 +18,20 @@ class God:
 	'''
 	def __init__(self) -> None:
 		self._asset = modules.asset.Asset(settings.INITIAL_ASSET_PRICE, settings.MEAN_REVERSION_FACTOR, settings.SIGMA_ASSET)
-		self._list_exchanges: List[orderbook.orderbook.NonUniqueIdOrderBook] = [orderbook.orderbook.NonUniqueIdOrderBook() for i in range(settings.EXCHANGES_COUNT)]
 		self._regulator: modules.regulator.Regulator = modules.regulator.Regulator(
-			NBBO_delay = settings.NBBO_DELAY,
+			national_best_bid_and_offer_delay = settings.NATIONAL_BEST_BID_AND_OFFER_DELAY,
 			asset = self._asset,
-			list_exchanges = self._list_exchanges
 		)
-		self._list_zero_intelligence_traders: List[modules.zerointelligence.ZeroIntelligence] = [modules.zerointelligence.ZeroIntelligence(
-			idx = i,
-			quantity_max = settings.QUANTITY_MAX,
-			shading_min = settings.SHADING_MIN,
-			shading_max = settings.SHADING_MAX,
-			regulator = self._regulator,
-			default_exchange = random.choice(self._list_exchanges),
-		) for i in range(settings.ZERO_INTELLIGENCE_COUNT)]
+		self._list_zero_intelligence_traders: List[modules.zerointelligence.ZeroIntelligence] = [
+			modules.zerointelligence.ZeroIntelligence(
+				idx = i,
+				quantity_max = settings.QUANTITY_MAX,
+				shading_min = settings.SHADING_MIN,
+				shading_max = settings.SHADING_MAX,
+				regulator = self._regulator,
+				default_exchange = random.choice(list(self._regulator.exchanges.keys())),
+			) for i in range(settings.ZERO_INTELLIGENCE_COUNT)
+		]
 		self._arbitrageur = modules.arbitrageur.Arbitrageur(regulator = self._regulator)
 		self._summarized_entries: pd.Series = None
 		self.summarize_entries()
@@ -57,17 +58,14 @@ class God:
 		It iterates over all traders in the time in which they arrive and trade.
 		'''
 		for timestamp, trader in self._summarized_entries.iteritems():
-			executed_trade_id = trader.trade(timestamp)
-			if executed_trade_id is not None:
-				self._list_zero_intelligence_traders[executed_trade_id].update_position_and_trades()
-				self._list_zero_intelligence_traders[executed_trade_id].current_order = None
-			self._regulator.save_current_NBBO(timestamp)
-			self._arbitrageur.hunt_and_kill()
-
-		#for trader in self._list_zero_intelligence_traders:
-		#	print(len(trader.trades))
-		print(sum([
-			trader.calculate_total_payoff()
-			for trader in self._list_zero_intelligence_traders
-		]))
-		
+			self._regulator.current_time = timestamp
+			self._regulator.remove_redundant_historic_exchanges()
+			trader_executed_by_zerointelligence = trader.trade()
+			self._regulator.add_current_exchanges_to_historic_exchanges()
+			trader_executed_long, trader_executed_short = self._arbitrageur.hunt_and_kill()
+			executed_traders_list = [trader_executed_by_zerointelligence, trader_executed_long, trader_executed_short]
+			
+			for executed_trader in executed_traders_list:
+				if executed_trader is not None:
+					self._list_zero_intelligence_traders[executed_trader].update_position_and_trades()
+					self._list_zero_intelligence_traders[executed_trader].current_order = None
