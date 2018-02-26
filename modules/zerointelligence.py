@@ -15,26 +15,15 @@ class ZeroIntelligence(modules.trader.Trader):
 	'''
 	ZeroIntelligence arrive according to a Poisson process and trade randomly.
 	'''
-	def __init__(self, idx: int, quantity_max: int, shading_min: int, shading_max: int,
+	def __init__(self, quantity_max: int, shading_min: int, shading_max: int,
 	default_exchange: str, *args, **kwargs) -> None:
 		super(ZeroIntelligence, self).__init__(*args, **kwargs)
-		self._idx = idx
 		self.quantity_max = quantity_max
 		self.utility = []
 		self.private_valuation = 0
-		self.position = 0
-		self.side: int = None
 		self.shading_min: int = shading_min
 		self.shading_max: int = shading_max
 		self.default_exchange = default_exchange
-
-
-	def __str__(self):
-		return(f'ZeroIntelligence trader {self._idx}')
-
-
-	def __lt__(self, other):
-		return self._idx < other._idx
 
 
 	def get_public_utility_of_the_asset(self) -> decimal.Decimal:

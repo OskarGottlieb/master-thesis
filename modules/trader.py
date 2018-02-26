@@ -12,7 +12,7 @@ class Trader:
 	The trader class has functions that every trader type will make use of - mainly sending orders onto the exchange.
 	'''
 
-	def __init__(self, regulator: modules.regulator.Regulator) -> None:
+	def __init__(self, regulator: modules.regulator.Regulator, idx: int) -> None:
 		self.regulator = regulator
 		self._last_order: Dict[str, Any] = None
 		self.current_order: modules.misc.CurrentOrder = None
@@ -20,7 +20,16 @@ class Trader:
 		self.last_entry = 0
 		self.position = 0
 		self.side: int = None
-		
+		self._idx = idx
+
+
+	def __str__(self):
+		return(f'{self.__class__.__name__} {self._idx}')
+
+
+	def __lt__(self, other):
+		return self._idx < other._idx
+
 
 	def add_limit_order(self, price: int, seconds: int, nanoseconds: int, exchange_name:str) -> None:
 		''''
