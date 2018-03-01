@@ -1,4 +1,4 @@
-from typing import Any, List
+from typing import Any, List, NamedTuple
 import itertools
 import random
 import numpy as np
@@ -11,6 +11,16 @@ import modules.marketmaker
 import modules.regulator
 import modules.settings as settings
 import modules.zerointelligence
+
+
+
+class GodResponse(NamedTuple):
+	'''
+	God response gives us metrics which we then use to 
+	'''
+	mean_execution_time: float
+	zero_intelligence_surplus: float
+	arbitrageur_profit: float
 
 
 
@@ -82,7 +92,8 @@ class God:
 	def run_simulation(self):
 		'''
 		Main function, which is called at the beginning of the simulation.
-		It iterates over all traders in the time in which they arrive and trade.
+		It iterates over all traders in the time in which they arrive and trade. It calls arbitrageur ad hoc, as he is checking
+		the market for any arbitrage opportunities all the time.
 		'''
 		for timestamp, trader in self._summarized_entries.iteritems():
 			self._regulator.current_time = timestamp
@@ -96,3 +107,14 @@ class God:
 				if executed_trader is not None:
 					self._list_zero_intelligence_traders[executed_trader].update_position_and_trades()
 					self._list_zero_intelligence_traders[executed_trader].current_order = None
+		
+
+		return GodResponse(
+			mean_execution_time = np.mean(self._regulator.execution_times),
+			zero_intelligence_surplus = sum([
+				zero_intelligence_trader.calculate_total_surplus()
+				for zero_intelligence_trader in self._list_zero_intelligence_traders
+			]),
+			arbitrageur_profit = self._arbitrageur.calculate_total_surplus()
+		)
+

@@ -11,7 +11,13 @@ import modules.trader
 
 
 class MarketMaker(modules.trader.Trader):
+	'''
+	
+	'''
 	def __init__(self, default_exchange:str, *args, **kwargs):
 		super(MarketMaker, self).__init__(*args, **kwargs)
 		self.default_exchange = default_exchange
-		
+
+
+	def trade(self):
+		pass

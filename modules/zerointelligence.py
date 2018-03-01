@@ -20,10 +20,10 @@ class ZeroIntelligence(modules.trader.Trader):
 		super(ZeroIntelligence, self).__init__(*args, **kwargs)
 		self.quantity_max = quantity_max
 		self.utility = []
-		self.private_valuation = 0
 		self.shading_min: int = shading_min
 		self.shading_max: int = shading_max
 		self.default_exchange = default_exchange
+		self.list_private_utility: List[float] = []
 
 
 	def get_public_utility_of_the_asset(self) -> decimal.Decimal:
@@ -31,7 +31,7 @@ class ZeroIntelligence(modules.trader.Trader):
 		Represents equation (1), slightly rewritten.
 		'''
 		mean_price = self.regulator.asset.mean_price
-		return mean_price + (self.regulator.asset.latest_price - mean_price) * \
+		return mean_price + (self.regulator.asset.last_price - mean_price) * \
 		(1 - settings.MEAN_REVERSION_FACTOR) ** (settings.SESSION_LENGTH - self.regulator.current_time)
 
 
@@ -47,10 +47,12 @@ class ZeroIntelligence(modules.trader.Trader):
 		'''
 		The private part of the utility depends on two factors, that are the current position that the trader holds
 		and whether he is a buyer or a seller. Given that the vector is `2 * self.quantity_max` long, we get to the 
-		middle of the list with `self.quantity_max - 1` + the adjustments (that is the position is actually 0).
+		middle of the list with `self.quantity_max - 1` + the adjustments of side and position.
 		'''
 		utility_vector = self.generate_private_component_gain()
-		return utility_vector[self.quantity_max - 1 + self.side + self.position]
+		# We save the value into an object attribute, as we will need it when calculating the surplus.
+		self.private_utility = utility_vector[self.quantity_max - 1 + self.side + self.position]
+		return self.private_utility
 
 
 	def generate_offset(self):
@@ -181,33 +183,13 @@ class ZeroIntelligence(modules.trader.Trader):
 		return None
 
 
-	def calculate_total_payoff(self) -> int:
+	def calculate_total_surplus(self) -> int:
 		'''
 		At the end of trading this function sums the total payoff which consists of the closed trades (Profit or Loss)
 		and of the open position, valued at the current price, adjusted for private benefits.
 		'''
-		payoff: int = 0
-		side = 1 if np.sign(self.position) > 0 else 0
-		if len(self.trades):
-			trades_dataframe = pd.DataFrame(self.trades)[['side', 'price']]
-			trades_dataframe['side'] = trades_dataframe['side'].replace(0, -1)
-			trades_dataframe = trades_dataframe.sort_values(by = ['side'], ascending = side)
-			if self.position:
-				remaining_trades_dataframe = trades_dataframe[-abs(self.position):]
-				trades_dataframe = trades_dataframe[:-abs(self.position)]
-			payoff += sum(trades_dataframe['side'] * trades_dataframe['price'])
-		if self.position:
-			payoff += sum([
-			 	trade - self.regulator.asset.latest_price
-			 	for trade in remaining_trades_dataframe['price']
-			]) * self.position
-			# Again we need to adjust the position in the
-			if side > 0:
-				lower_bound = self.quantity_max - 1 + side
-				upper_bound = lower_bound + self.position
-			else:
-				upper_bound = self.quantity_max - 1 + side
-				lower_bound = upper_bound + self.position
-
-			payoff += sum(self.generate_private_component_gain()[lower_bound:upper_bound])
+		payoff = self.calculate_profit_from_trading()
+		payoff += self.calculate_value_of_final_position()
+		payoff += sum(self.list_private_utility)
 		return payoff
+		
