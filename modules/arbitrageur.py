@@ -40,3 +40,10 @@ class Arbitrageur(modules.trader.Trader):
 				exchange_name = exchange_name
 			))
 		return trader_ids
+
+
+	def calculate_total_surplus(self) -> float:
+		'''
+		At the end of trading, arbitrageur has a flat position and therefore only submits his total profit.
+		'''
+		return self.calculate_profit_from_trading()

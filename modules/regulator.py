@@ -1,4 +1,5 @@
 from typing import Dict, List, NamedTuple
+import collections
 import copy
 import orderbook
 
@@ -44,11 +45,13 @@ class Regulator:
 			)
 		]
 		self.current_time = 0
+		# Once trader's order is executed, we keep track of it in the execution_times list, in the end we take a mean
+		# of the time it took for a resting order to be executed.
+		self.execution_times: List[float] = []
 		self.last_order_idx: Dict[str, int] = {'bid': 0, 'ask': 0}
-		# Orders will hold information about the trader who is behind the order.
-		# This way we know which trader to call to mark his trade as executed, once the trade is...executed.
-		self.orders: Dict[modules.misc.CurrentOrder, int] = {}
-		#self.arbitrageur = modules.arbitrageur.Arbitrageur(regulator = self)
+		# Meta will hold information about the trader who is behind the order, as well about the times the order
+		# was added into the orderbook and later executed.
+		self.meta: Dict[modules.misc.CurrentOrder, Dict[str, Any]] = {}
 		self.add_current_exchanges_to_historic_exchanges()
 
 
