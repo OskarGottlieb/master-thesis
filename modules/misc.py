@@ -39,6 +39,15 @@ class NBBO(NamedTuple):
 
 
 
+class TraderIdx(NamedTuple):
+	'''
+	TraderIdx uniquely identifies a trader among all traders.
+	'''
+	idx: int
+	type: str
+
+
+
 def side_to_orderbook_type(side: int):
 	'''
 	Converts the integer of 1 (0) into an appropriate side type.
