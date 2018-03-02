@@ -20,26 +20,26 @@ class Arbitrageur(modules.trader.Trader):
 		If the condition of ask being below the bid is fulfilled, the Arbitrageur trades.
 		'''
 		national_best_bid_and_offer = self.get_accurate_national_best_bid_and_offer(
+			current_orders = None,
 			exchanges = self.regulator.historic_exchanges_list[0].exchanges,
-			current_order = None
 		)
 		if (national_best_bid_and_offer.bid and national_best_bid_and_offer.ask) and \
 		(national_best_bid_and_offer.bid > national_best_bid_and_offer.ask):
 			return self.trade_arbitrage(national_best_bid_and_offer)
-		return [None, None]
+		return {}
 
 
 	def trade_arbitrage(self, national_best_bid_and_offer: modules.misc.NBBO) -> List[int]:
 		'''
 		Based on the state of the national_best_bid_and_offer, this funciton calls execute_order() two times for each exchange. 
 		'''
-		trader_ids = []
+		executed_traders_dict = {}
 		for count, exchange_name in enumerate((national_best_bid_and_offer.bid_exchange, national_best_bid_and_offer.ask_exchange)):
 			self.side = count
-			trader_ids.append(self.execute_order(
+			executed_traders_dict.update(self.execute_order(
 				exchange_name = exchange_name
 			))
-		return trader_ids
+		return executed_traders_dict
 
 
 	def calculate_total_surplus(self) -> float:

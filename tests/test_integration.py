@@ -22,12 +22,12 @@ def test_regulator_process_long_order_where_nbbo_ask_is_traders_order(basic_regu
 		order_price = 1000,
 		timestamp = 11,
 		default_exchange = list(basic_regulator.exchanges.keys())[0],
-		current_order = modules.misc.CurrentOrder(
+		current_orders = [modules.misc.CurrentOrder(
 			idx = 1,
 			side = 1,
 			price = 1000,
 			exchange_name = settings.NAMES_OF_EXCHANGES[1]
-		)
+		)]
 	)
 
 	assert regulator_response.exchange == list(basic_regulator.exchanges.keys())[0]

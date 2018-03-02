@@ -51,7 +51,7 @@ class Regulator:
 		self.last_order_idx: Dict[str, int] = {'bid': 0, 'ask': 0}
 		# Meta will hold information about the trader who is behind the order, as well about the times the order
 		# was added into the orderbook and later executed.
-		self.meta: Dict[modules.misc.CurrentOrder, Dict[str, Any]] = {}
+		self.meta: Dict[order_executed_by_zerointelligence.misc.CurrentOrder, Dict[str, Any]] = {}
 		self.add_current_exchanges_to_historic_exchanges()
 
 

@@ -49,11 +49,20 @@ class God:
 				idx = i,
 				regulator = self._regulator,
 				default_exchange = random.choice(list(self._regulator.exchanges.keys())),
+				number_of_orders = settings.MARKET_MAKER_NUMBER_ORDERS,
+				ticks_between_orders = settings.MARKET_MAKER_NUMBER_OF_TICKS_BETWEEN_ORDERS,
+				spread_around_asset = settings.MARKET_MAKER_SPREAD_AROUND_ASSET,
 			) for i in range(settings.MARKET_MAKERS_COUNT)
 		]
 		self._arbitrageur = modules.arbitrageur.Arbitrageur(regulator = self._regulator, idx = 1)
 		self._summarized_entries: pd.Series = None
 		self.summarize_entries()
+
+		# In the end, we merge all traders into one list.
+		self._all_traders: Dict[modules.misc.TraderIdx: Any] = {
+			modules.misc.TraderIdx(trader._idx, trader.__class__.__name__): trader
+			for trader in self._list_zero_intelligence_traders + self._market_makers
+		}
 
 
 	def generate_entries(self, traders_list: List[Any],	intensity_of_poisson_process: float, traders_count: int) -> pd.Series:
@@ -96,17 +105,16 @@ class God:
 		the market for any arbitrage opportunities all the time.
 		'''
 		for timestamp, trader in self._summarized_entries.iteritems():
+			executed_traders_dict = {}
 			self._regulator.current_time = timestamp
+			self._regulator.asset.get_new_price()
 			self._regulator.remove_redundant_historic_exchanges()
-			trader_executed_by_zerointelligence = trader.trade()
+			executed_traders_dict.update(trader.trade())
 			self._regulator.add_current_exchanges_to_historic_exchanges()
-			trader_executed_long, trader_executed_short = self._arbitrageur.hunt_and_kill()
-			executed_traders_list = [trader_executed_by_zerointelligence, trader_executed_long, trader_executed_short]
-			
-			for executed_trader in executed_traders_list:
-				if executed_trader is not None:
-					self._list_zero_intelligence_traders[executed_trader].update_position_and_trades()
-					self._list_zero_intelligence_traders[executed_trader].current_order = None
+			executed_traders_dict.update(self._arbitrageur.hunt_and_kill())
+			for trader_idx, order in executed_traders_dict.items():
+				self._all_traders[trader_idx].update_position_and_trades(order)
+				self._all_traders[trader_idx].current_orders.remove(order)
 		
 
 		return GodResponse(

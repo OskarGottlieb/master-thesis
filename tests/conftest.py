@@ -5,9 +5,10 @@ import pytest
 import orderbook
 
 import modules.asset
+import modules.marketmaker
 import modules.regulator
 import modules.settings as settings
-
+import modules.zerointelligence
 
 
 @pytest.fixture
@@ -101,6 +102,18 @@ def basic_zerointelligence(basic_regulator, empty_orderbook):
 		shading_max = settings.SHADING_MAX,
 		regulator = basic_regulator,
 		default_exchange = settings.NAMES_OF_EXCHANGES[0],
+	)
+
+
+@pytest.fixture
+def basic_marketmaker(basic_regulator, empty_orderbook):
+	return modules.marketmaker.MarketMaker(
+		idx = 1,
+		regulator = basic_regulator,
+		default_exchange = settings.NAMES_OF_EXCHANGES[0],
+		number_of_orders = settings.MARKET_MAKER_NUMBER_ORDERS,
+		ticks_between_orders = settings.MARKET_MAKER_NUMBER_OF_TICKS_BETWEEN_ORDERS,
+		spread_around_asset = settings.MARKET_MAKER_SPREAD_AROUND_ASSET,
 	)
 
 
