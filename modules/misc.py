@@ -1,4 +1,5 @@
 from typing import NamedTuple
+import random
 import orderbook
 
 
@@ -27,6 +28,15 @@ class ExchangeInfo(NamedTuple):
 
 
 
+class ExchangeResponse(NamedTuple):
+	'''
+	Standardized response that the trader receives after he submits his instructions to the exchange.
+	'''
+	action: str
+	price: int
+
+
+
 class NBBO(NamedTuple):
 	'''
 	NBBO (abbreviation of National Best Bid and Offer) stores information about the best bid and ask values
@@ -48,6 +58,16 @@ class TraderIdx(NamedTuple):
 
 
 
+class TraderOrderIdx(NamedTuple):
+	'''
+	TraderOrderIdx is sent as an exchange response so that we can find the trader and his order and delete them from the
+	:params current_orders: list.
+	'''
+	trader_idx: TraderIdx
+	order: CurrentOrder
+
+
+
 def side_to_orderbook_type(side: int):
 	'''
 	Converts the integer of 1 (0) into an appropriate side type.
@@ -60,3 +80,4 @@ def side_to_orderbook_type(side: int):
 def side_to_string(side: int) -> str:
 	assert side in (0, 1), f'{side} is not a valid side input.'
 	return 'bid' if side else 'ask'
+
