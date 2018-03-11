@@ -10,15 +10,6 @@ import modules.settings as settings
 
 
 
-class ExchangeResponse(NamedTuple):
-	'''
-	Standardized response that the trader receives after he submits his instructions to the exchange.
-	'''
-	action: str
-	price: int
-
-
-
 class HistoricExchanges(NamedTuple):
 	'''
 	Slow traders see different NBBO than fast arbitrageur, we therefore keep the historic snapshot of the exchanges in
@@ -51,11 +42,11 @@ class Regulator:
 		self.last_order_idx: Dict[str, int] = {'bid': 0, 'ask': 0}
 		# Meta will hold information about the trader who is behind the order, as well about the times the order
 		# was added into the orderbook and later executed.
-		self.meta: Dict[modules.misc.CurrentOrder, Dict[str, Any]] = {}
+		self.meta: Dict[order_executed_by_zerointelligence.misc.CurrentOrder, Dict[str, Any]] = {}
 		self.add_current_exchanges_to_historic_exchanges()
 
 
-	def process_order(self, side: int, order_price: int, exchange_name: str) -> ExchangeResponse:
+	def process_order(self, side: int, order_price: int, exchange_name: str) -> modules.misc.ExchangeResponse:
 		'''
 		The order comes in and we need to decide, whether it will be executed or added to the orderbook.
 		This order has already been routed by the trader, therefore the exchange is fixed, price is fixed, the only
@@ -73,9 +64,7 @@ class Regulator:
 		if best_price and ((side and best_price <= order_price) or (not side and best_price >= order_price)):
 			order_price = best_price
 			action = 'E'
-		else:
-			self.last_order_idx[modules.misc.side_to_string(side)] += 1
-		return ExchangeResponse(action, order_price)
+		return modules.misc.ExchangeResponse(action, order_price)
 
 
 	def copy_all_orders_from_one_exchange_to_another(self, old_exchange: orderbook.orderbook.NonUniqueIdOrderBook) -> orderbook.orderbook.NonUniqueIdOrderBook:
@@ -90,7 +79,8 @@ class Regulator:
 		return new_exchange
 
 
-	def convert_order_to_dictionary(self, order):
+	@staticmethod
+	def convert_order_to_dictionary(order):
 		return {
 			'side': order.side,
 			'order_id': order.id,
@@ -122,8 +112,16 @@ class Regulator:
 		'''
 		The :national_best_bid_and_offer_delay: sets the maximum delay, therefore we can delete historic snapshot of exchanges
 		which are older than the first exchange which is older than :params national_best_bid_and_offer_delay:.
+		We can then refer to the information which slow traders see simply as the last element of :params self.historic_exchanges_list:.
 		'''
 		for idx, historic_exchange in enumerate(self.historic_exchanges_list):
 			if self.current_time - self.national_best_bid_and_offer_delay >= historic_exchange.timestamp:
 				self.historic_exchanges_list = self.historic_exchanges_list[:max(idx, 1)]
 				return
+
+
+	def do(self) -> None:
+		'''
+		The do function is called only in case of the batch auction, as these require period actions from the Regulator.
+		It gathers all orders which were submitted during the batch interval and processes them accordingly.
+		'''
