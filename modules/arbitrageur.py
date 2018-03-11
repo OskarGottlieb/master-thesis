@@ -26,20 +26,20 @@ class Arbitrageur(modules.trader.Trader):
 		if (national_best_bid_and_offer.bid and national_best_bid_and_offer.ask) and \
 		(national_best_bid_and_offer.bid > national_best_bid_and_offer.ask):
 			return self.trade_arbitrage(national_best_bid_and_offer)
-		return {}
+		return []
 
 
 	def trade_arbitrage(self, national_best_bid_and_offer: modules.misc.NBBO) -> List[int]:
 		'''
 		Based on the state of the national_best_bid_and_offer, this funciton calls execute_order() two times for each exchange. 
 		'''
-		executed_traders_dict = {}
+		list_traders_orders = []
 		for count, exchange_name in enumerate((national_best_bid_and_offer.bid_exchange, national_best_bid_and_offer.ask_exchange)):
 			self.side = count
-			executed_traders_dict.update(self.execute_order(
+			list_traders_orders = list_traders_orders + self.execute_order(
 				exchange_name = exchange_name
-			))
-		return executed_traders_dict
+			)
+		return list_traders_orders
 
 
 	def calculate_total_surplus(self) -> float:

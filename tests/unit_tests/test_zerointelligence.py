@@ -1,6 +1,7 @@
 from typing import Any, Dict
-import orderbook
 import mock
+import orderbook
+import pytest
 
 import modules.zerointelligence
 
@@ -25,4 +26,3 @@ def test_private_utility_of_the_asset(mock_private_component_gain, basic_zeroint
 	
 	assert private_utility_buyer == -2 
 	assert private_utility_seller == 3 
-

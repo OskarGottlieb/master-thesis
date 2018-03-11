@@ -1,5 +1,6 @@
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Optional, Tuple
 import decimal
+import math
 import operator
 import orderbook
 import sys
@@ -17,7 +18,7 @@ class Trader:
 	def __init__(self, regulator: modules.regulator.Regulator, idx: int) -> None:
 		self.regulator = regulator
 		self._last_order: Dict[str, Any] = None
-		self.current_orders: [modules.misc.CurrentOrder] = None
+		self.current_orders: [modules.misc.CurrentOrder] = []
 		self.trades: List[modules.misc.CurrentOrder] = []
 		self.last_entry = 0
 		self.position = 0
@@ -33,15 +34,14 @@ class Trader:
 		return self._idx < other._idx
 
 
-	def add_limit_order(self, price: int, seconds: int, nanoseconds: int, exchange_name:str) -> None:
+	def add_limit_order(self, price: int, seconds: int, nanoseconds: int, exchange_name: str) -> None:
 		''''
 		We first check whether the trader has any order on any exchange. If he has, we delete the order.
 		Then the function updates the number of last order on the market as a whole. This should ensure uniqueness of
 		the id per side on all exchanges. It then assigns the order and exchange to the Trader class for future reference.
 		Finally it submits the order onto the appropriate exchange.
 		'''
-		order_idx = self.regulator.last_order_idx[modules.misc.side_to_string(self.side)]
-		side = modules.misc.side_to_orderbook_type(self.side)
+		order_idx = self.increase_last_order_idx(modules.misc.side_to_string(self.side))
 		new_order = modules.misc.CurrentOrder(order_idx, self.side, price, exchange_name)
 		self.current_orders.append(new_order)
 		self.last_entry = seconds + nanoseconds
@@ -52,7 +52,7 @@ class Trader:
 			'time_entry': self.last_entry,
 		}
 		self.regulator.exchanges[exchange_name].add_order(
-			side = side,
+			side = modules.misc.side_to_orderbook_type(self.side),
 			order_id = order_idx,
 			price = price,
 			quantity = 1,
@@ -61,7 +61,6 @@ class Trader:
 				'timestamp': seconds * int(1e9) + nanoseconds * int(1e18)
 			}
 		)
-
 
 
 	def execute_order(self, exchange_name: str) -> int:
@@ -77,7 +76,7 @@ class Trader:
 			side = side
 		)
 		# We have to keep track of the trader who initially submitted the order onto the exchange.
-		passive_side_order = modules.misc.CurrentOrder(best_order.id, not self.side, best_order.price, exchange_name)
+		passive_side_order = modules.misc.CurrentOrder(best_order.id, int(not self.side), best_order.price, exchange_name)
 		trader_with_passive_limit_order = self.regulator.meta[
 			passive_side_order
 		]
@@ -85,7 +84,10 @@ class Trader:
 		self.update_position_and_trades(
 			order = modules.misc.CurrentOrder(best_order.id, self.side, best_order.price, exchange_name)
 		)
-		return {trader_with_passive_limit_order['trader_idx'] : passive_side_order}
+		return [modules.misc.TraderOrderIdx(
+			trader_idx = trader_with_passive_limit_order['trader_idx'],
+			order = passive_side_order
+		)]
 
 
 	def delete_order_from_an_exchange(self, order: modules.misc.CurrentOrder, exchange_name: str,
@@ -109,6 +111,14 @@ class Trader:
 		self.position += order.side if order.side else -1
 		self.trades.append(order)
 		self.add_private_utility_to_list()
+
+
+	def increase_last_order_idx(self, side: str) -> int:
+		'''
+
+		'''
+		self.regulator.last_order_idx[side] += 1
+		return self.regulator.last_order_idx[side]
 
 
 	def add_private_utility_to_list(self, active_trade: bool = False) -> None:
@@ -138,6 +148,7 @@ class Trader:
 			exchanges = self.regulator.historic_exchanges_list[-1].exchanges,
 			current_orders = self.current_orders,
 		)
+
 
 	def get_accurate_national_best_bid_and_offer(self, current_orders: modules.misc.CurrentOrder,
 	exchanges: Dict[str, orderbook.orderbook.NonUniqueIdOrderBook]) -> modules.misc.NBBO:
@@ -173,6 +184,26 @@ class Trader:
 			ask_exchange = ask_exchange
 		)
 
+
+	def process_exchange_response(self, exchange_name: str, action: str, price: int) -> Optional[Tuple[dict, modules.misc.CurrentOrder]]:
+		'''
+		The information about the trader's intention (buying/selling at which price) is sent to the regulator and processed.
+		Regulator knows of the (delayed) NBBO and therefore returns the exchange, action (adding a limit order or executing a
+		resting order). If the trade is executed, the function returns the ID of the trader whose order has been executed.
+		'''
+		if action == 'A':
+			nanoseconds, seconds = math.modf(self.regulator.current_time)
+			self.add_limit_order(
+				price = price, 
+				seconds = seconds,
+				nanoseconds = nanoseconds,
+				exchange_name = exchange_name
+			)
+		else:
+			return self.execute_order(
+				exchange_name = exchange_name
+			)
+		return []
 
 	def calculate_profit_from_trading(self):
 		'''

@@ -20,14 +20,6 @@ def orderbook_with_normal_bid_and_ask():
 
 
 @pytest.fixture
-def orderbook_with_best_bid_and_ask():
-	basic_orderbook = orderbook.orderbook.NonUniqueIdOrderBook()
-	basic_orderbook.add_order(**best_bid())
-	basic_orderbook.add_order(**best_ask())
-	return basic_orderbook
-
-
-@pytest.fixture
 def orderbook_with_best_bid_and_worst_ask():
 	basic_orderbook = orderbook.orderbook.NonUniqueIdOrderBook()
 	basic_orderbook.add_order(**best_bid())
@@ -110,7 +102,7 @@ def basic_marketmaker(basic_regulator, empty_orderbook):
 	return modules.marketmaker.MarketMaker(
 		idx = 1,
 		regulator = basic_regulator,
-		default_exchange = settings.NAMES_OF_EXCHANGES[0],
+		exchange_name = settings.NAMES_OF_EXCHANGES[0],
 		number_of_orders = settings.MARKET_MAKER_NUMBER_ORDERS,
 		ticks_between_orders = settings.MARKET_MAKER_NUMBER_OF_TICKS_BETWEEN_ORDERS,
 		spread_around_asset = settings.MARKET_MAKER_SPREAD_AROUND_ASSET,

@@ -62,9 +62,9 @@ class ZeroIntelligence(modules.trader.Trader):
 		self.side = np.random.binomial(1, 0.5)
 
 
-	def trade(self):
+	def do(self):
 		'''
-		The trade function is called every time a trader enters the market according to his poisson process.
+		The do function is called every time a trader enters the market according to his poisson process.
 		It starts off by calling the asset function which adds a new price into the list of asset's prices.
 		After that the trader's side is drawn from a binomial distribution.
 		Then trader's public and private component of his valuation are calculated and summed along with
@@ -90,11 +90,12 @@ class ZeroIntelligence(modules.trader.Trader):
 			exchange_name = self.default_exchange,
 			order_price = order_price
 		)
-		action, price = self.process_response_from_exchange(
+		action, price = self.send_order_to_the_exchange(
 			exchange_name = exchange_name,
 			order_price = order_price
 		)
-		return self.send_order(
+		self.current_orders = []
+		return self.process_exchange_response(
 			exchange_name = exchange_name,
 			action = action,
 			price = price
@@ -130,9 +131,9 @@ class ZeroIntelligence(modules.trader.Trader):
 		return (exchange_name, order_price)
 
 
-	def process_response_from_exchange(self, exchange_name:str, order_price: int) -> None:
+	def send_order_to_the_exchange(self, exchange_name:str, order_price: int) -> modules.misc.ExchangeResponse:
 		'''
-		We get back the info from the exchange (wrapped by the Regulator object), saying whether our order was executed or added to the orderbook.
+		We get back the info from the exchange (wrapped in the ExchangeResponse object), saying whether our order was executed or added to the orderbook.
 		It is also possible that the price updates (if there is a better order in the market).
 		'''
 		return self.regulator.process_order(
@@ -140,28 +141,6 @@ class ZeroIntelligence(modules.trader.Trader):
 			order_price = order_price,
 			exchange_name = exchange_name,
 		)
-
-
-	def send_order(self, exchange_name: str, action: str, price: int) -> Optional[Tuple[dict, modules.misc.CurrentOrder]]:
-		'''
-		The information about the trader's intention (buying/selling at which price) is sent to the regulator and processed.
-		Regulator knows of the (delayed) NBBO and therefore returns the exchange, action (adding a limit order or executing a
-		resting order). If the trade is executed, the function returns the ID of the trader whose order has been executed.
-		'''
-		self.current_orders = []
-		if action == 'A':
-			nanoseconds, seconds = math.modf(self.regulator.current_time)
-			self.add_limit_order(
-				price = price, 
-				seconds = seconds,
-				nanoseconds = nanoseconds,
-				exchange_name = exchange_name
-			)
-		else:
-			return self.execute_order(
-				exchange_name = exchange_name
-			)
-		return {}
 
 
 	def calculate_total_surplus(self) -> int:

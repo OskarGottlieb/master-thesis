@@ -1,9 +1,9 @@
 from typing import Any, List, NamedTuple
 import itertools
-import random
 import numpy as np
 import pandas as pd
 import orderbook
+import random
 
 import modules.asset
 import modules.arbitrageur
@@ -20,6 +20,7 @@ class GodResponse(NamedTuple):
 	'''
 	mean_execution_time: float
 	zero_intelligence_surplus: float
+	marketmaker_surplus: float
 	arbitrageur_profit: float
 
 
@@ -48,7 +49,7 @@ class God:
 			modules.marketmaker.MarketMaker(
 				idx = i,
 				regulator = self._regulator,
-				default_exchange = random.choice(list(self._regulator.exchanges.keys())),
+				exchange_name = random.choice(list(self._regulator.exchanges.keys())),
 				number_of_orders = settings.MARKET_MAKER_NUMBER_ORDERS,
 				ticks_between_orders = settings.MARKET_MAKER_NUMBER_OF_TICKS_BETWEEN_ORDERS,
 				spread_around_asset = settings.MARKET_MAKER_SPREAD_AROUND_ASSET,
@@ -105,23 +106,26 @@ class God:
 		the market for any arbitrage opportunities all the time.
 		'''
 		for timestamp, trader in self._summarized_entries.iteritems():
-			executed_traders_dict = {}
+			list_traders_orders = []
 			self._regulator.current_time = timestamp
 			self._regulator.asset.get_new_price()
 			self._regulator.remove_redundant_historic_exchanges()
-			executed_traders_dict.update(trader.trade())
+			list_traders_orders = list_traders_orders + trader.do()
 			self._regulator.add_current_exchanges_to_historic_exchanges()
-			executed_traders_dict.update(self._arbitrageur.hunt_and_kill())
-			for trader_idx, order in executed_traders_dict.items():
-				self._all_traders[trader_idx].update_position_and_trades(order)
-				self._all_traders[trader_idx].current_orders.remove(order)
-		
+			list_traders_orders = list_traders_orders + self._arbitrageur.hunt_and_kill()
+			for trader_order_pair in list_traders_orders:
+				self._all_traders[trader_order_pair.trader_idx].update_position_and_trades(trader_order_pair.order)
+				self._all_traders[trader_order_pair.trader_idx].current_orders.remove(trader_order_pair.order)
 
 		return GodResponse(
 			mean_execution_time = np.mean(self._regulator.execution_times),
 			zero_intelligence_surplus = sum([
 				zero_intelligence_trader.calculate_total_surplus()
 				for zero_intelligence_trader in self._list_zero_intelligence_traders
+			]),
+			marketmaker_surplus = sum([
+				marketmaker.calculate_total_surplus()
+				for marketmaker in self._market_makers
 			]),
 			arbitrageur_profit = self._arbitrageur.calculate_total_surplus()
 		)
