@@ -135,8 +135,8 @@ class Trader:
 		'''
 		Represents equation (1), slightly rewritten.
 		'''
-		mean_price = self.regulator.asset.mean_price
-		return mean_price + (self.regulator.asset.last_price - mean_price) * \
+		mean_value = self.regulator.asset.mean_value
+		return mean_value + (self.regulator.asset.last_value - mean_value) * \
 		(1 - settings.MEAN_REVERSION_FACTOR) ** (settings.SESSION_LENGTH - self.regulator.current_time)
 
 
@@ -218,4 +218,4 @@ class Trader:
 		'''
 		Returns the remaining position (long, or short) multiplied by the last price of the asset.
 		'''
-		return self.position * self.regulator.asset.last_price
+		return self.position * self.regulator.asset.last_value

@@ -30,7 +30,7 @@ class God:
 	God knows everything and controls everything.
 	'''
 	def __init__(self) -> None:
-		self._asset = modules.asset.Asset(settings.INITIAL_ASSET_PRICE, settings.MEAN_REVERSION_FACTOR, settings.SIGMA_ASSET)
+		self._asset = modules.asset.Asset(settings.INITIAL_ASSET_VALUE, settings.MEAN_REVERSION_FACTOR, settings.SIGMA_ASSET)
 		self._regulator: modules.regulator.Regulator = modules.regulator.Regulator(
 			national_best_bid_and_offer_delay = settings.NATIONAL_BEST_BID_AND_OFFER_DELAY,
 			asset = self._asset,
@@ -108,7 +108,7 @@ class God:
 		for timestamp, trader in self._summarized_entries.iteritems():
 			list_traders_orders = []
 			self._regulator.current_time = timestamp
-			self._regulator.asset.get_new_price()
+			self._regulator.asset.get_new_value()
 			self._regulator.remove_redundant_historic_exchanges()
 			list_traders_orders = list_traders_orders + trader.do()
 			self._regulator.add_current_exchanges_to_historic_exchanges()

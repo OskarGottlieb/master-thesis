@@ -71,7 +71,7 @@ def empty_orderbook():
 @pytest.fixture(scope = 'module')
 def basic_asset() -> modules.asset.Asset:
 	return modules.asset.Asset(
-		initial_price = settings.INITIAL_ASSET_PRICE,
+		initial_value = settings.INITIAL_ASSET_VALUE,
 		mean_reversion_factor = settings.MEAN_REVERSION_FACTOR,
 		sigma = settings.SIGMA_ASSET
 	)
