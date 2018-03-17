@@ -26,7 +26,8 @@ class MarketMaker(modules.trader.Trader):
 
 	def do(self) -> Dict:
 		'''
-		Trade function calls all the functions which are necessary for the trader to trade.
+		Marketmaker first creates the two ladders of orders, which he then trims according to current market prices.
+
 		'''
 		highest_bid, lowest_ask = self.get_central_ladder_prices()
 		ladder_bids, ladder_asks = self.generate_order_ladders(
@@ -47,16 +48,13 @@ class MarketMaker(modules.trader.Trader):
 		self.current_orders = []
 
 		list_trader_order_tuple = []
-		
 		for side, order_prices in enumerate([trimmed_ladder_asks, trimmed_ladder_bids]):
-			for order_price in order_prices:
-				response = self.send_order_to_the_exchange(side, order_price)
-				self.side = side
-				list_trader_order_tuple = list_trader_order_tuple + self.process_exchange_response(
-					**response._asdict(),
-					exchange_name = self.exchange_name
+			for limit_price in order_prices:
+				self.send_order_to_the_exchange(
+					side = side,
+					exchange_name = self.exchange_name,
+					limit_price = limit_price
 				)
-		return list_trader_order_tuple
 
 
 	def get_central_ladder_prices(self) -> Tuple[List[Optional[int]], List[Optional[int]]]:
@@ -65,7 +63,7 @@ class MarketMaker(modules.trader.Trader):
 		'''
 		price_estimate = self.get_estimate_of_the_fundamental_value_of_the_asset()
 		return tuple(
-			max(price_estimate + 0.5 * offset, 0)
+			int(max(price_estimate + 0.5 * offset, 0))
 			for offset in (- settings.MARKET_MAKER_SPREAD_AROUND_ASSET, settings.MARKET_MAKER_SPREAD_AROUND_ASSET)
 		)
 
@@ -94,18 +92,6 @@ class MarketMaker(modules.trader.Trader):
 		if national_best_bid_and_offer.ask:
 			trimmed_ladder_bids = [int(bid) for bid in trimmed_ladder_bids if bid < national_best_bid_and_offer.ask]
 		return (trimmed_ladder_bids, trimmed_ladder_asks)
-
-
-	def send_order_to_the_exchange(self, side: int, limit_price: int) -> List:
-		'''
-		We get back the info from the exchange (wrapped in the ExchangeResponse object), saying whether our order was executed or added to the orderbook.
-		'''
-		return self.regulator.process_order(
-			side = side,
-			order_price = limit_price,
-			exchange_name = self.exchange_name,
-		)
-
 
 
 	def calculate_total_surplus(self) -> int:

@@ -37,7 +37,6 @@ class God:
 		)
 		self._list_zero_intelligence_traders: List[modules.zerointelligence.ZeroIntelligence] = [
 			modules.zerointelligence.ZeroIntelligence(
-				idx = i,
 				quantity_max = settings.QUANTITY_MAX,
 				shading_min = settings.SHADING_MIN,
 				shading_max = settings.SHADING_MAX,
@@ -47,7 +46,6 @@ class God:
 		]
 		self._market_makers: List[modules.marketmaker.MarketMaker] = [
 			modules.marketmaker.MarketMaker(
-				idx = i,
 				regulator = self._regulator,
 				exchange_name = random.choice(list(self._regulator.exchanges.keys())),
 				number_of_orders = settings.MARKET_MAKER_NUMBER_ORDERS,
@@ -55,14 +53,12 @@ class God:
 				spread_around_asset = settings.MARKET_MAKER_SPREAD_AROUND_ASSET,
 			) for i in range(settings.MARKET_MAKERS_COUNT)
 		]
-		self._arbitrageur = modules.arbitrageur.Arbitrageur(regulator = self._regulator, idx = 1)
-		self._summarized_entries: pd.Series = None
+		self._arbitrageur = modules.arbitrageur.Arbitrageur(regulator = self._regulator)
+		self._summarized_entries: pd.Series = pd.Series()
 		self.summarize_entries()
-
 		# In the end, we merge all traders into one list.
-		self._all_traders: Dict[modules.misc.TraderIdx: Any] = {
-			modules.misc.TraderIdx(trader._idx, trader.__class__.__name__): trader
-			for trader in self._list_zero_intelligence_traders + self._market_makers
+		self._all_traders: Dict[int: Any] = {
+			trader._idx: trader for trader in self._list_zero_intelligence_traders + self._market_makers
 		}
 
 
@@ -96,7 +92,7 @@ class God:
 			traders_count = settings.MARKET_MAKERS_COUNT,
 			intensity_of_poisson_process = settings.INTENSITY_MARKET_MAKER,
 		)
-		self._summarized_entries = pd.concat([zero_intelligence_entries, market_maker_entries]).sort_index()
+		self._summarized_entries = pd.concat([zero_intelligence_entries, market_maker_entries, self._regulator.clearing_times]).sort_index()
 
 
 	def run_simulation(self):
@@ -105,17 +101,20 @@ class God:
 		It iterates over all traders in the time in which they arrive and trade. It calls arbitrageur ad hoc, as he is checking
 		the market for any arbitrage opportunities all the time.
 		'''
-		for timestamp, trader in self._summarized_entries.iteritems():
-			list_traders_orders = []
+		for timestamp, agent in self._summarized_entries.iteritems():
 			self._regulator.current_time = timestamp
 			self._regulator.asset.get_new_value()
 			self._regulator.remove_redundant_historic_exchanges()
-			list_traders_orders = list_traders_orders + trader.do()
+			agent.do()
+			# If the trading is continuous, clear after every agent's (MM/ZI) action.
+			if not self._regulator.batch_auction_length:
+				self._regulator.clear_orders_in_continuous_auction()
 			self._regulator.add_current_exchanges_to_historic_exchanges()
-			list_traders_orders = list_traders_orders + self._arbitrageur.hunt_and_kill()
-			for trader_order_pair in list_traders_orders:
-				self._all_traders[trader_order_pair.trader_idx].update_position_and_trades(trader_order_pair.order)
-				self._all_traders[trader_order_pair.trader_idx].current_orders.remove(trader_order_pair.order)
+			self._arbitrageur.do()
+
+			# for trader_order_pair in list_traders_orders:
+			#	self._all_traders[trader_order_pair.trader_idx].update_position_and_trades(trader_order_pair.order)
+			#	self._all_traders[trader_order_pair.trader_idx].current_orders.remove(trader_order_pair.order)
 
 		return GodResponse(
 			mean_execution_time = np.mean(self._regulator.execution_times),

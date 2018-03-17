@@ -53,7 +53,6 @@ expected_trimmed_ladder_bids, expected_trimmed_ladder_asks, set_global_delay) ->
 	that is it removes orders which would be executed immediately.
 	'''
 	settings.NATIONAL_BEST_BID_AND_OFFER_DELAY = set_global_delay
-	print(settings.NATIONAL_BEST_BID_AND_OFFER_DELAY)
 	basic_marketmaker.exchange_name = settings.NAMES_OF_EXCHANGES[1]
 	basic_regulator.exchanges = {
 		settings.NAMES_OF_EXCHANGES[0]: new_york_orderbook,

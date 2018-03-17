@@ -1,19 +1,29 @@
-from typing import NamedTuple
+from typing import NamedTuple, Union
 import random
 import orderbook
 
 
 
-class CurrentOrder(NamedTuple):
+class Order(NamedTuple):
+	'''
+	Similar to limit orderbook, but it is simply the order the trader submits, it does not have an ID and it does not sit
+	in the orderbook.
+	'''
+	side: int
+	limit_price:int
+	exchange_name: str
+
+
+
+class LimitOrder(NamedTuple):
 	'''
 	Contains information about the current limit order the trader has on an exchange.
 	The order is then defined by its idx and by the side. The idx is unit per market (inter-exchange).
-	The side is 1 (0) if the trader is has a long (short) limit order.
-	Finally price is the prices at which the order sits in the orderbook.
+	The side is 1 (0) if the trader is has a long (short) limit order. The order does not contain price, as it can be moved
+	in the orderbook on market clearing.
 	'''
 	idx: int
-	side: int
-	price:int
+	side: orderbook.types.OrderSide
 	exchange_name: str
 
 
@@ -49,22 +59,13 @@ class NBBO(NamedTuple):
 
 
 
-class TraderIdx(NamedTuple):
-	'''
-	TraderIdx uniquely identifies a trader among all traders.
-	'''
-	idx: int
-	type: str
-
-
-
 class TraderOrderIdx(NamedTuple):
 	'''
-	TraderOrderIdx is sent as an exchange response so that we can find the trader and his order and delete them from the
-	:params current_orders: list.
+	TraderOrderIdx is used for keeping track of both the order which has been submitted and trade who submitted it.
 	'''
-	trader_idx: TraderIdx
-	order: CurrentOrder
+	trader_idx: int
+	timestamp: float
+	order: Union[Order,LimitOrder]
 
 
 

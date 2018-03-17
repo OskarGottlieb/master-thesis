@@ -14,6 +14,7 @@ logwood.basic_config(level = logwood.INFO)
 		
 
 def set_parameters_value(parameters: pd.DataFrame) -> None:
+	print(parameters)
 	parameters = parameters.to_dict('records')[0]
 	settings.ZERO_INTELLIGENCE_COUNT = int(parameters['zero_intelligence_count'])
 	settings.INTENSITY_ZERO_INTELLIGENCE = parameters['zero_intelligence_intensity']
@@ -36,7 +37,7 @@ def main() -> None:
 	parameters_table = modules.database.get_parameters_table()
 	headers = pd.read_csv(settings.PARAMETERS_SET).columns.values
 	parameters_dataframe = pd.DataFrame(parameters_table, columns = headers)
-	list_ids_to_be_processed = [500]
+	list_ids_to_be_processed = [120]
 	while True:
 		parameters_set_id = random.choice(list_ids_to_be_processed)
 		parameters = parameters_dataframe[parameters_dataframe['id'] == parameters_set_id].drop('id', 1)
@@ -45,6 +46,7 @@ def main() -> None:
 		for i in range(10):
 			GOD = modules.god.God()
 			list_responses.append(GOD.run_simulation())
+			print(list_responses[-1])
 		modules.database.insert_new_results(
 			parameters_set_id = parameters_set_id,
 			list_responses = list_responses
@@ -52,6 +54,7 @@ def main() -> None:
 
 
 if __name__ == '__main__':
-	for process in range(4):
-		process = multiprocessing.Process(target = main)
-		process.start()
+	main()
+	#for process in range(4):
+	#	process = multiprocessing.Process(target = main)
+	#	process.start()

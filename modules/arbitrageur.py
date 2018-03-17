@@ -14,7 +14,7 @@ class Arbitrageur(modules.trader.Trader):
 		super(Arbitrageur, self).__init__(*args, **kwargs)
 
 
-	def hunt_and_kill(self) -> Optional[List[int]]:
+	def do(self) -> None:
 		'''
 		The arbitrageur knows of the correct NBBO thanks to his infinite speed.
 		If the condition of ask being below the bid is fulfilled, the Arbitrageur trades.
@@ -25,21 +25,21 @@ class Arbitrageur(modules.trader.Trader):
 		)
 		if (national_best_bid_and_offer.bid and national_best_bid_and_offer.ask) and \
 		(national_best_bid_and_offer.bid > national_best_bid_and_offer.ask):
-			return self.trade_arbitrage(national_best_bid_and_offer)
-		return []
+			self.trade_arbitrage(national_best_bid_and_offer)
 
 
-	def trade_arbitrage(self, national_best_bid_and_offer: modules.misc.NBBO) -> List[int]:
+	def trade_arbitrage(self, national_best_bid_and_offer: modules.misc.NBBO) -> None:
 		'''
-		Based on the state of the national_best_bid_and_offer, this funciton calls execute_order() two times for each exchange. 
+		Based on the state of the national_best_bid_and_offer, this funciton generates two orders which are routed to appropriate exchanges
+		with the same (!) price.
 		'''
-		list_traders_orders = []
-		for count, exchange_name in enumerate((national_best_bid_and_offer.bid_exchange, national_best_bid_and_offer.ask_exchange)):
-			self.side = count
-			list_traders_orders = list_traders_orders + self.execute_order(
-				exchange_name = exchange_name
+		limit_price = int((national_best_bid_and_offer.bid + national_best_bid_and_offer.ask) / 2)
+		for side, exchange_name in enumerate((national_best_bid_and_offer.bid_exchange, national_best_bid_and_offer.ask_exchange)):
+			self.send_order_to_the_exchange(
+				side = side,
+				exchange_name = exchange_name,
+				limit_price = limit_price
 			)
-		return list_traders_orders
 
 
 	def calculate_total_surplus(self) -> float:

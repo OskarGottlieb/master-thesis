@@ -7,9 +7,9 @@ import modules.settings as settings
 
 
 
-@pytest.mark.parametrize('new_york_orderbook,chicago_orderbook,estimate_of_asset_value,orders_count,\
+@pytest.mark.parametrize('auction_length,new_york_orderbook,chicago_orderbook,estimate_of_asset_value,orders_count,\
 ticks_between_orders,spread_around_asset,new_york_bid,new_york_ask,chicago_bid,chicago_ask', [
-	(pytest.lazy_fixture('empty_orderbook'), pytest.lazy_fixture('orderbook_with_normal_bid_and_ask'), 500, 2, 5, 100, [450, 445], [550, 555], [500], [1000]),
+	(0, pytest.lazy_fixture('empty_orderbook'), pytest.lazy_fixture('orderbook_with_normal_bid_and_ask'), 500, 2, 5, 100, [450, 445], [550, 555], [500], [1000]),
 ])
 @mock.patch('modules.marketmaker.MarketMaker.get_estimate_of_the_fundamental_value_of_the_asset')
 def test_sending_orders_to_the_exchange(mock_estimate_of_asset, basic_marketmaker, basic_regulator, new_york_orderbook,
@@ -30,7 +30,7 @@ new_york_ask, chicago_bid, chicago_ask) -> None:
 	basic_regulator.current_time = 1
 	basic_regulator.add_current_exchanges_to_historic_exchanges()
 	basic_regulator.remove_redundant_historic_exchanges()
-	basic_marketmaker.trade()
+	basic_marketmaker.do()
 
 	resulting_prices = {}
 	for exchange_name, exchange in basic_regulator.exchanges.items():

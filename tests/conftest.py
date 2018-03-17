@@ -78,17 +78,17 @@ def basic_asset() -> modules.asset.Asset:
 
 
 @pytest.fixture
-def basic_regulator(basic_asset):
+def basic_regulator(basic_asset, auction_length):
 	return modules.regulator.Regulator(
 		national_best_bid_and_offer_delay = settings.NATIONAL_BEST_BID_AND_OFFER_DELAY,
 		asset = basic_asset,
+		batch_auction_length = auction_length
 	)
 
 
 @pytest.fixture
 def basic_zerointelligence(basic_regulator, empty_orderbook):
 	return modules.zerointelligence.ZeroIntelligence(
-		idx = 1,
 		quantity_max = settings.QUANTITY_MAX,
 		shading_min = settings.SHADING_MIN,
 		shading_max = settings.SHADING_MAX,
@@ -100,13 +100,17 @@ def basic_zerointelligence(basic_regulator, empty_orderbook):
 @pytest.fixture
 def basic_marketmaker(basic_regulator, empty_orderbook):
 	return modules.marketmaker.MarketMaker(
-		idx = 1,
 		regulator = basic_regulator,
 		exchange_name = settings.NAMES_OF_EXCHANGES[0],
 		number_of_orders = settings.MARKET_MAKER_NUMBER_ORDERS,
 		ticks_between_orders = settings.MARKET_MAKER_NUMBER_OF_TICKS_BETWEEN_ORDERS,
 		spread_around_asset = settings.MARKET_MAKER_SPREAD_AROUND_ASSET,
 	)
+
+
+@pytest.fixture(scope = 'session')
+def auction_length() -> int:
+	return settings.BATCH_AUCTION_LENGTH
 
 
 @pytest.fixture(scope = 'session')
