@@ -28,6 +28,15 @@ class LimitOrder(NamedTuple):
 
 
 
+class Trade(NamedTuple):
+	'''
+	Trade is only a tuple of side and price, good enough for computing trader's profit (and surplus) at the end of the trading session.
+	'''
+	price: int
+	side: int
+
+
+
 class ExchangeInfo(NamedTuple):
 	'''
 	When we iterate over the exchanges, we want to save their best bid and ask prices along with the reference to the exchange.
@@ -59,13 +68,13 @@ class NBBO(NamedTuple):
 
 
 
-class TraderOrderIdx(NamedTuple):
+class TraderTimestamp(NamedTuple):
 	'''
-	TraderOrderIdx is used for keeping track of both the order which has been submitted and trade who submitted it.
+	TraderTimestamp is used for keeping track of the timestamp at which a given trader has either submitted an order
+	or time at which his order was executed.
 	'''
 	trader_idx: int
 	timestamp: float
-	order: Union[Order,LimitOrder]
 
 
 

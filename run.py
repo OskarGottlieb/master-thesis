@@ -10,11 +10,10 @@ import modules.settings as settings
 
 
 
-logwood.basic_config(level = logwood.INFO)
+logwood.basic_config(level = logwood.WARNING)
 		
 
 def set_parameters_value(parameters: pd.DataFrame) -> None:
-	print(parameters)
 	parameters = parameters.to_dict('records')[0]
 	settings.ZERO_INTELLIGENCE_COUNT = int(parameters['zero_intelligence_count'])
 	settings.INTENSITY_ZERO_INTELLIGENCE = parameters['zero_intelligence_intensity']
@@ -26,6 +25,7 @@ def set_parameters_value(parameters: pd.DataFrame) -> None:
 	settings.MARKET_MAKER_NUMBER_OF_TICKS_BETWEEN_ORDERS = int(parameters['market_maker_number_of_ticks_between_orders'])
 	settings.MARKET_MAKER_SPREAD_AROUND_ASSET = int(parameters['market_maker_spread_around_asset'])
 	settings.NATIONAL_BEST_BID_AND_OFFER_DELAY = int(parameters['national_best_bid_and_offer_delay'])
+	settings.BATCH_AUCTION_LENGTH = int(parameters['batch_auction_length'])
 	settings.SESSION_LENGTH = int(parameters['session_length'])
 
 

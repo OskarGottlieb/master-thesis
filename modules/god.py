@@ -2,6 +2,7 @@ from typing import Any, List, NamedTuple
 import itertools
 import numpy as np
 import pandas as pd
+import logwood
 import orderbook
 import random
 
@@ -58,8 +59,9 @@ class God:
 		self.summarize_entries()
 		# In the end, we merge all traders into one list.
 		self._all_traders: Dict[int: Any] = {
-			trader._idx: trader for trader in self._list_zero_intelligence_traders + self._market_makers
+			trader._idx: trader for trader in self._list_zero_intelligence_traders + self._market_makers + [self._arbitrageur]
 		}
+		self.logger = logwood.get_logger(f'{self.__class__.__name__}')
 
 
 	def generate_entries(self, traders_list: List[Any],	intensity_of_poisson_process: float, traders_count: int) -> pd.Series:
@@ -95,6 +97,31 @@ class God:
 		self._summarized_entries = pd.concat([zero_intelligence_entries, market_maker_entries, self._regulator.clearing_times]).sort_index()
 
 
+	def process_exchange_responses(self) -> None:
+		'''
+		The wrapper module takes regulator's both dictionaries with responses of additions and executions and processes them
+		by assigning the Orders to respective traders. The orders have already been executed on the respecitve exchange.
+		'''
+		if self._regulator.dict_regulator_responses_additions:
+			for order in self._regulator.dict_regulator_responses_additions:
+				self.logger.info(f'Processing \'A\' {order} by trader {self._regulator.meta[order].trader_idx}')
+				self._all_traders[self._regulator.dict_regulator_responses_additions[order].trader_idx].current_orders.append(order)
+		if self._regulator.dict_regulator_responses_executions:
+			for order in self._regulator.dict_regulator_responses_executions:
+				self.logger.info(
+					f'''
+						Executing {order} of {self._all_traders[self._regulator.meta
+						[order].trader_idx].__class__.__name__} {self._regulator.meta[order].trader_idx}
+					'''
+				)
+				trader = self._all_traders[self._regulator.dict_regulator_responses_executions[order].trader_idx]
+				trader.update_position_and_trades(
+		 			order = order
+				)
+
+		self._regulator.reset_regulator_information()
+
+
 	def run_simulation(self):
 		'''
 		Main function, which is called at the beginning of the simulation.
@@ -110,8 +137,11 @@ class God:
 			if not self._regulator.batch_auction_length:
 				self._regulator.clear_orders_in_continuous_auction()
 			self._regulator.add_current_exchanges_to_historic_exchanges()
+			self.process_exchange_responses()
 			self._arbitrageur.do()
-
+			if not self._regulator.batch_auction_length:
+				self._regulator.clear_orders_in_continuous_auction()
+				self.process_exchange_responses()
 			# for trader_order_pair in list_traders_orders:
 			#	self._all_traders[trader_order_pair.trader_idx].update_position_and_trades(trader_order_pair.order)
 			#	self._all_traders[trader_order_pair.trader_idx].current_orders.remove(trader_order_pair.order)

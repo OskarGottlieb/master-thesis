@@ -19,6 +19,7 @@ CREATE TABLE settings(
 	market_maker_number_of_ticks_between_orders int,
 	market_maker_spread_around_asset int,
 	national_best_bid_and_offer_delay int,
+	batch_auction_length int,
 	session_length int
 );
 

@@ -18,14 +18,27 @@ class Arbitrageur(modules.trader.Trader):
 		'''
 		The arbitrageur knows of the correct NBBO thanks to his infinite speed.
 		If the condition of ask being below the bid is fulfilled, the Arbitrageur trades.
+		In 
 		'''
+		if self.regulator.batch_auction_length and (self.last_entry > self.regulator.last_clearing_time):
+			return
 		national_best_bid_and_offer = self.get_accurate_national_best_bid_and_offer(
-			current_orders = None,
+			current_orders = self.current_orders,
 			exchanges = self.regulator.historic_exchanges_list[0].exchanges,
 		)
+		if self.current_orders:
+			for order in self.current_orders:
+				self.delete_order_from_an_exchange(
+					order = order,
+					exchange_name = order.exchange_name,
+					exchanges = self.regulator.exchanges,
+				)
+		self.current_orders = []
+
 		if (national_best_bid_and_offer.bid and national_best_bid_and_offer.ask) and \
 		(national_best_bid_and_offer.bid > national_best_bid_and_offer.ask):
 			self.trade_arbitrage(national_best_bid_and_offer)
+		self.last_entry = self.regulator.current_time
 
 
 	def trade_arbitrage(self, national_best_bid_and_offer: modules.misc.NBBO) -> None:
@@ -40,10 +53,3 @@ class Arbitrageur(modules.trader.Trader):
 				exchange_name = exchange_name,
 				limit_price = limit_price
 			)
-
-
-	def calculate_total_surplus(self) -> float:
-		'''
-		At the end of trading, arbitrageur has a flat position and therefore only submits his total profit.
-		'''
-		return self.calculate_profit_from_trading()

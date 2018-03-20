@@ -1,5 +1,6 @@
 from typing import Any, Dict, List, Optional, Tuple
 import decimal
+import logwood
 import math
 import operator
 import orderbook
@@ -25,6 +26,7 @@ class Trader:
 		self.position = 0
 		self.side: int = None
 		self._idx = Trader.idx
+		self.logger = logwood.get_logger(f'{self.__class__.__name__}{self._idx}')
 		Trader.idx += 1
 
 
@@ -36,42 +38,16 @@ class Trader:
 		return self._idx < other._idx
 
 
-	
-	def execute_order(self, exchange_name: str) -> int:
-		''''
-		We first delete any existing limit orders. Then we proceed to the execution of a "market" type order.
-		'''
-		# mot side transforms True into False and vice versa
-		side = modules.misc.side_to_orderbook_type(not self.side)
-		best_order = self.regulator.exchanges[exchange_name].get_side(side).get_best()
-		self.regulator.exchanges[exchange_name].fill_order(
-			order_id = best_order.id,
-			filled_quantity = 1,
-			side = side
-		)
-		# We have to keep track of the trader who initially submitted the order onto the exchange.
-		passive_side_order = modules.misc.LimitOrder(best_order.id, int(not self.side), best_order.price, exchange_name)
-		trader_with_passive_limit_order = self.regulator.meta[
-			passive_side_order
-		]
-		self.regulator.execution_times.append(self.regulator.current_time - trader_with_passive_limit_order['time_entry'])
-		self.update_position_and_trades(
-			order = modules.misc.LimitOrder(best_order.id, self.side, best_order.price, exchange_name)
-		)
-		return [modules.misc.TraderOrderIdx(
-			trader_idx = trader_with_passive_limit_order['trader_idx'],
-			order = passive_side_order
-		)]
-
 
 	def delete_order_from_an_exchange(self, order: modules.misc.LimitOrder, exchange_name: str,
 	exchanges: Dict[str, orderbook.orderbook.NonUniqueIdOrderBook]) -> None:
 		'''
 		Given any exchange (be it historical, or real time), this function deletes an existing (!) limit order.
 		'''
+		self.logger.info(f'Trader {self._idx} is trying to delete order {order.idx} at side {order.side}')
 		exchanges[exchange_name].delete_order(
 			order_id = order.idx,
-			side = modules.misc.side_to_orderbook_type(order.side)
+			side = order.side
 		)
 
 
@@ -81,10 +57,22 @@ class Trader:
 		We add (subtract) 1 from the :param position: in case the trader's' buy (sell) order goes through.
 		Also we add the current order to the list of trades.
 		'''
-		# If the execution is passive
-		self.position += order.side if order.side else -1
-		self.trades.append(order)
+		if order in self.current_orders:
+			self.current_orders.remove(order)
+		self.position += 1 if order.side == orderbook.OrderSide.BID else -1
+		self.trades.append(self.order_to_trade(order))
 		self.add_private_utility_to_list()
+
+
+	def order_to_trade(self, order: modules.misc.LimitOrder) -> modules.misc.Trade:
+		if self.regulator.batch_auction_length:
+			order_price = self.regulator.clearing_price[order.exchange_name]
+		else:
+			order_price = self.regulator.dict_prices_of_executed_orders[order]
+		return modules.misc.Trade(
+			side = 1 if order.side == orderbook.OrderSide.BID else 0,
+			price = order_price
+		)
 
 
 	def add_private_utility_to_list(self, active_trade: bool = False) -> None:
@@ -153,19 +141,21 @@ class Trader:
 
 	def send_order_to_the_exchange(self, side: str, exchange_name: str, limit_price: int) -> List:
 		'''
-		We get back the info from the exchange (wrapped in the ExchangeResponse object), saying whether our order was executed or added to the orderbook.
+		We are sending the original order as the key of the dictionary, with the trader and the timestamp as the values,
+		as later on when processing the order, it is simpler to refer to the orders as the main identifiers.
 		'''
-		self.regulator.list_orders_to_be_processed.append(
-			modules.misc.TraderOrderIdx(
-				trader_idx = self._idx,
-				timestamp = self.regulator.current_time,
-				order = modules.misc.Order(
-					side = side,
-					limit_price = limit_price,
-					exchange_name = exchange_name,
-				)
-			)
+		order = modules.misc.Order(
+			side = side,
+			limit_price = limit_price,
+			exchange_name = exchange_name,
 		)
+		trader_timestamp = modules.misc.TraderTimestamp(
+			trader_idx = self._idx,
+			timestamp = self.regulator.current_time
+		)
+		self.regulator.dict_orders_to_be_processed.update({
+			order: trader_timestamp
+		})
 
 
 	def process_exchange_response(self, side: str, exchange_name: str, action: str, price: int) -> Optional[Tuple[dict, modules.misc.LimitOrder]]:
@@ -203,3 +193,15 @@ class Trader:
 		Returns the remaining position (long, or short) multiplied by the last price of the asset.
 		'''
 		return self.position * self.regulator.asset.last_value
+
+
+	def calculate_total_surplus(self) -> int:
+		'''
+		At the end of trading this function sums the total payoff which consists of the closed trades (Profit or Loss)
+		and of the open position, valued at the current price, adjusted for private benefits.
+		'''
+		payoff = self.calculate_profit_from_trading()
+		payoff += self.calculate_value_of_final_position()
+		if self.__class__.__name__ == settings.TRADER_TYPES[2]:
+			payoff += sum(self.list_private_utility)
+		return payoff

@@ -1,5 +1,6 @@
 from typing import Dict, List, Optional, Tuple
 import decimal
+import logwood
 import math
 
 import numpy as np
@@ -29,6 +30,7 @@ class MarketMaker(modules.trader.Trader):
 		Marketmaker first creates the two ladders of orders, which he then trims according to current market prices.
 
 		'''
+		self.last_entry = self.regulator.current_time
 		highest_bid, lowest_ask = self.get_central_ladder_prices()
 		ladder_bids, ladder_asks = self.generate_order_ladders(
 			highest_bid = highest_bid,
@@ -50,6 +52,7 @@ class MarketMaker(modules.trader.Trader):
 		list_trader_order_tuple = []
 		for side, order_prices in enumerate([trimmed_ladder_asks, trimmed_ladder_bids]):
 			for limit_price in order_prices:
+				self.logger.info(f'Sending order {side} to exchange {self.exchange_name} at price {limit_price}')
 				self.send_order_to_the_exchange(
 					side = side,
 					exchange_name = self.exchange_name,
@@ -92,13 +95,3 @@ class MarketMaker(modules.trader.Trader):
 		if national_best_bid_and_offer.ask:
 			trimmed_ladder_bids = [int(bid) for bid in trimmed_ladder_bids if bid < national_best_bid_and_offer.ask]
 		return (trimmed_ladder_bids, trimmed_ladder_asks)
-
-
-	def calculate_total_surplus(self) -> int:
-		'''
-		At the end of trading this function sums the total payoff which consists of the closed trades (Profit or Loss)
-		and of the open position, valued at the current price, adjusted for private benefits.
-		'''
-		payoff = self.calculate_profit_from_trading()
-		payoff += self.calculate_value_of_final_position()
-		return payoff
