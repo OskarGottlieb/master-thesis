@@ -29,7 +29,6 @@ class Regulator:
 	def __init__(self, national_best_bid_and_offer_delay: float, asset: modules.asset.Asset, batch_auction_length: int = settings.BATCH_AUCTION_LENGTH) -> None:
 		self.logger = logwood.get_logger(f'{self.__class__.__name__}')
 		self.national_best_bid_and_offer_delay = national_best_bid_and_offer_delay
-		self.accurate_national_best_bid_and_offer: modules.misc.NBBO = modules.misc.NBBO(None, None, None, None)
 		self.asset = asset
 		self.batch_auction_length = batch_auction_length
 		self.exchanges: Dict[str, orderbook.orderbook.NonUniqueIdOrderBook] = {
@@ -61,6 +60,7 @@ class Regulator:
 		self.dict_regulator_responses_executions: Dict[modules.misc.Order: modules.misc.TraderTimestamp] = {}
 		self.dict_prices_of_executed_orders: Dict[modules.misc.Order: int] = {}
 		self.clearing_price: Dict[str, int] = {}
+		self.list_market_information: List[modules.misc.MarketInfo] = []
 
 
 	def generate_batch_auction_clearing_times(self, batch_auction_length: int) -> pd.Series:
@@ -83,6 +83,8 @@ class Regulator:
 
 	def process_order(self, order: modules.misc.Order, trader_timestamp: modules.misc.TraderTimestamp) -> None:
 		'''
+		Only called in continuous trading.
+
 		The order comes in and we need to decide, whether it will be executed or added to the orderbook.
 		This order has already been routed by the trader, therefore the exchange is fixed, limit price is given, the only
 		thing that matters is whether the order is executed immediately or not.
@@ -94,19 +96,30 @@ class Regulator:
 		try:
 			best_order = self.exchanges[order.exchange_name].get_side(side_type).get_best()
 			best_price = best_order.price
-			limit_order = self.orderbook_type_order_to_limit_order(order.exchange_name, best_order)
+			limit_order_passive = self.orderbook_type_order_to_limit_order(order.exchange_name, best_order)
+			limit_order_active = self.orderbook_type_order_to_limit_order(order.exchange_name, best_order, True)
 		except orderbook.exceptions.OrderSideEmpty:
 			best_price = None
 
 		if best_price and ((order.side and best_price <= order.limit_price) or (not order.side and best_price >= order.limit_price)):
+			self.logger.info(f'Trader {trader_timestamp.trader_idx} is actively hiting trader\'s {self.meta[limit_order_passive].trader_idx} order on exchange {order.exchange_name} at price {best_price}')			
+			self.meta[limit_order_active] = trader_timestamp
+			self.dict_prices_of_executed_orders.update(
+				{limit_order_passive: best_price, limit_order_active: best_price}
+			)
+			# We first add the passive side of the execution and then the active one.
 			self.dict_regulator_responses_executions.update(
 				self.execute_order(
 					exchange_name = order.exchange_name,
-					limit_order = best_order
+					limit_order = limit_order_passive,
 				)
 			)
-			self.dict_prices_of_executed_orders.update(
-				{limit_order: best_price}
+			self.dict_regulator_responses_executions.update(
+				self.execute_order(
+					exchange_name = order.exchange_name,
+					limit_order = limit_order_active,
+					active_hit = True
+				)
 			)
 		else:
 			self.dict_regulator_responses_additions.update(
@@ -243,13 +256,16 @@ class Regulator:
 			highest_ask_price, lowest_bid_price = None, None
 			for order in range(min(len(bid_orders), len(ask_orders))):
 				if bid_orders[order].price >= ask_orders[order].price:
-					self.logger.info(f'Bid price of {bid_orders[order].price} and ask price of {ask_orders[order].price} clear.')
 					highest_ask_price = ask_orders[order].price
 					lowest_bid_price = bid_orders[order].price
-					self.logger.info(f'Ask price is {highest_ask_price}, bid price is {lowest_bid_price}')
-					for order in (bid_orders[order], ask_orders[order]):
-						self.remove_executed_order_from_dict_of_additions(exchange_name, order)
-						dict_exchanges_orders_to_be_cleared[exchange_name].append(order)
+					trader_bid = self.meta[self.orderbook_type_order_to_limit_order(exchange_name, bid_orders[order])]
+					trader_ask = self.meta[self.orderbook_type_order_to_limit_order(exchange_name, ask_orders[order])]
+					for executed_order in (bid_orders[order], ask_orders[order]):
+						self.remove_executed_order_from_dict_of_additions(exchange_name, executed_order)
+						dict_exchanges_orders_to_be_cleared[exchange_name].append(
+							executed_order
+						)
+					self.logger.info(f'The {exchange_name} exchange cleared order {bid_orders[order].id} of trader {trader_bid.trader_idx} and {ask_orders[order].id} of {trader_ask.trader_idx}.') 
 					continue
 				break
 			if highest_ask_price and lowest_bid_price:
@@ -264,7 +280,7 @@ class Regulator:
 				self.dict_regulator_responses_executions.update(
 					self.execute_order(
 						exchange_name = exchange_name,
-						limit_order = limit_order
+						limit_order = self.orderbook_type_order_to_limit_order(exchange_name, limit_order)
 					)
 				)
 		
@@ -282,11 +298,16 @@ class Regulator:
 			del self.dict_regulator_responses_additions[limit_order]
 
 
-	@staticmethod
-	def orderbook_type_order_to_limit_order(exchange_name: str, order: orderbook.types.Order) -> modules.misc.LimitOrder:
+	def orderbook_type_order_to_limit_order(self, exchange_name: str, order: orderbook.types.Order, reverse_side: bool = False) -> modules.misc.LimitOrder:
+		side = order.side
+		order_id = order.id
+		if reverse_side:
+			side = orderbook.OrderSide.BID if order.side == orderbook.OrderSide.ASK else orderbook.OrderSide.ASK
+			order_id = self.increase_last_order_idx(modules.misc.side_orderbook_type_to_string(side))
+		
 		return modules.misc.LimitOrder(
-			idx = order.id,
-			side = order.side,
+			idx = order_id,
+			side = side,
 			exchange_name = exchange_name
 		)
 
@@ -346,25 +367,38 @@ class Regulator:
 		}
 
 
-	def execute_order(self, exchange_name: str, limit_order: orderbook.types.Order) -> int:
+	def execute_order(self, exchange_name: str, limit_order: modules.misc.LimitOrder, active_hit: bool = False) -> int:
 		'''
-		
+		We execute the passive order, the limit_order_active parameter is given only in continuous trading.
 		'''
-		self.logger.info(f'Executing order at {exchange_name} with order_id {limit_order.id} and at side {limit_order.side}')
-		self.exchanges[exchange_name].fill_order(
-			order_id = limit_order.id,
-			filled_quantity = 1,
-			side = limit_order.side
-		)
-		limit_order = self.orderbook_type_order_to_limit_order(exchange_name, limit_order)
-		trader_with_passive_limit_order = self.meta[limit_order]
+		if not active_hit:
+			filled_order = self.exchanges[exchange_name].fill_order(
+				order_id = limit_order.idx,
+				filled_quantity = 1,
+				side = limit_order.side
+			)
+		trader = self.meta[limit_order]
 		# Only save orders, which have been in the orderbook for more than the length of the batch auction,
 		# as those are the orders which have been in the orderbook as passive quotations.
-		if self.current_time - trader_with_passive_limit_order.timestamp > self.batch_auction_length:
-			self.execution_times.append(self.current_time - trader_with_passive_limit_order.timestamp)
+		self.execution_times.append(self.current_time - trader.timestamp)
 		return {
 			limit_order: modules.misc.TraderTimestamp(
-				trader_idx = trader_with_passive_limit_order.trader_idx,
+				trader_idx = trader.trader_idx,
 				timestamp = self.current_time
 			)
 		}
+
+
+	def save_market_information(self) -> None:
+		'''
+		Each cycle we save the information which the markets produce, from these we later compute metrics which measure the market's performance.
+		'''
+		pass
+
+
+	def calculate_mean_of_bid_ask_spread(self) -> float:
+		pass
+
+
+	def calculate_mean_of_bid_ask_spread(self) -> float:
+		pass

@@ -44,7 +44,7 @@ class Trader:
 		'''
 		Given any exchange (be it historical, or real time), this function deletes an existing (!) limit order.
 		'''
-		self.logger.info(f'Trader {self._idx} is trying to delete order {order.idx} at side {order.side}')
+		self.logger.info(f'Trader {self._idx} is deleting order {order.idx} on {order.exchange_name} exchange at the {order.side}')
 		exchanges[exchange_name].delete_order(
 			order_id = order.idx,
 			side = order.side
@@ -144,6 +144,7 @@ class Trader:
 		We are sending the original order as the key of the dictionary, with the trader and the timestamp as the values,
 		as later on when processing the order, it is simpler to refer to the orders as the main identifiers.
 		'''
+		self.logger.info(f'Sending order to the {modules.misc.side_to_string(side)} of the {exchange_name} exchange with limit price of {str(limit_price)}.')
 		order = modules.misc.Order(
 			side = side,
 			limit_price = limit_price,
@@ -156,27 +157,6 @@ class Trader:
 		self.regulator.dict_orders_to_be_processed.update({
 			order: trader_timestamp
 		})
-
-
-	def process_exchange_response(self, side: str, exchange_name: str, action: str, price: int) -> Optional[Tuple[dict, modules.misc.LimitOrder]]:
-		'''
-		The information about the trader's intention (buying/selling at which price) is sent to the regulator and processed.
-		Regulator knows of the (delayed) NBBO and therefore returns the exchange, action (adding a limit order or executing a
-		resting order). If the trade is executed, the function returns the ID of the trader whose order has been executed.
-		'''
-		if action == 'A':
-			nanoseconds, seconds = math.modf(self.regulator.current_time)
-			self.add_limit_order(
-				price = price, 
-				seconds = seconds,
-				nanoseconds = nanoseconds,
-				exchange_name = exchange_name
-			)
-		else:
-			return self.execute_order(
-				exchange_name = exchange_name
-			)
-		return []
 
 
 	def calculate_profit_from_trading(self):

@@ -81,6 +81,7 @@ class ZeroIntelligence(modules.trader.Trader):
 			self.get_private_utility_of_the_asset() +
 			self.generate_offset()
 		)
+		exchange_name = self.decide_what_exchange_and_price_to_choose(limit_price = limit_price)
 		if self.current_orders:
 			for order in self.current_orders:
 				self.delete_order_from_an_exchange(
@@ -89,10 +90,9 @@ class ZeroIntelligence(modules.trader.Trader):
 					exchanges = self.regulator.exchanges,
 				)
 		self.current_orders = []
-		self.logger.info(f'Sending order to side {self.side} of exchange {self.decide_what_exchange_and_price_to_choose(limit_price = limit_price)} with limit price of ' + str(limit_price))
 		self.send_order_to_the_exchange(
 			side = self.side,
-			exchange_name = self.decide_what_exchange_and_price_to_choose(limit_price = limit_price),
+			exchange_name = exchange_name,
 			limit_price = limit_price
 		)
 
@@ -107,19 +107,18 @@ class ZeroIntelligence(modules.trader.Trader):
 		exchanges = self.regulator.historic_exchanges_list[-1].exchanges
 		exchange_name = self.default_exchange
 		national_best_bid_and_offer = self.get_national_best_bid_and_offer()
-		
+		self.logger.info(f'Trader {self.__class__.__name__} sees {national_best_bid_and_offer}.')
 		# The default exchange does not have to have orders on one side, that is when the OrderSideEmpty exceptions
 		# is triggered and instead best_price is the best bid (ask) in case the trader is a seller (buyer).
 		try:
 			best_price = exchanges[exchange_name].get_side(side_type).get_best().price
 		except orderbook.exceptions.OrderSideEmpty:
 			best_price = national_best_bid_and_offer.ask if self.side else national_best_bid_and_offer.bid
-		if best_price:
-			if self.side and national_best_bid_and_offer.ask:
-				if limit_price >= national_best_bid_and_offer.ask and national_best_bid_and_offer.ask < best_price:
-					exchange_name = national_best_bid_and_offer.ask_exchange
-			elif not self.side and national_best_bid_and_offer.bid:
-				if limit_price <= national_best_bid_and_offer.bid and national_best_bid_and_offer.bid > best_price:
-					exchange_name = national_best_bid_and_offer.bid_exchange
+		if self.side and national_best_bid_and_offer.ask:
+			if limit_price >= national_best_bid_and_offer.ask and (best_price or (national_best_bid_and_offer.ask < best_price)):
+				exchange_name = national_best_bid_and_offer.ask_exchange
+		elif not self.side and national_best_bid_and_offer.bid:
+			if limit_price <= national_best_bid_and_offer.bid and (best_price or (national_best_bid_and_offer.bid > best_price)):
+				exchange_name = national_best_bid_and_offer.bid_exchange
 		return exchange_name
 

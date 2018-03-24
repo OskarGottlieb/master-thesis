@@ -52,7 +52,6 @@ class MarketMaker(modules.trader.Trader):
 		list_trader_order_tuple = []
 		for side, order_prices in enumerate([trimmed_ladder_asks, trimmed_ladder_bids]):
 			for limit_price in order_prices:
-				self.logger.info(f'Sending order {side} to exchange {self.exchange_name} at price {limit_price}')
 				self.send_order_to_the_exchange(
 					side = side,
 					exchange_name = self.exchange_name,

@@ -25,7 +25,9 @@ def set_parameters_value(parameters: pd.DataFrame) -> None:
 	settings.MARKET_MAKER_NUMBER_OF_TICKS_BETWEEN_ORDERS = int(parameters['market_maker_number_of_ticks_between_orders'])
 	settings.MARKET_MAKER_SPREAD_AROUND_ASSET = int(parameters['market_maker_spread_around_asset'])
 	settings.NATIONAL_BEST_BID_AND_OFFER_DELAY = int(parameters['national_best_bid_and_offer_delay'])
+	settings.NATIONAL_BEST_BID_AND_OFFER_DELAY = 1000
 	settings.BATCH_AUCTION_LENGTH = int(parameters['batch_auction_length'])
+	settings.BATCH_AUCTION_LENGTH = 0
 	settings.SESSION_LENGTH = int(parameters['session_length'])
 
 
@@ -46,15 +48,14 @@ def main() -> None:
 		for i in range(10):
 			GOD = modules.god.God()
 			list_responses.append(GOD.run_simulation())
-			print(list_responses[-1])
 		modules.database.insert_new_results(
 			parameters_set_id = parameters_set_id,
-			list_responses = list_responses
+		 	list_responses = list_responses
 		)
 
 
 if __name__ == '__main__':
 	main()
-	#for process in range(4):
-	#	process = multiprocessing.Process(target = main)
-	#	process.start()
+	for process in range(4):
+		process = multiprocessing.Process(target = main)
+		process.start()

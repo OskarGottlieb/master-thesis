@@ -78,6 +78,17 @@ class TraderTimestamp(NamedTuple):
 
 
 
+class MarketInfo(NamedTuple):
+	'''
+	Market info keeps track of market generated information which we will analyze in the end of the simulation.
+	'''
+	timestamp: float
+	bid_ask_spread_mean: float
+	asset_price: float
+	asset_value: float
+
+
+
 def side_to_orderbook_type(side: int):
 	'''
 	Converts the integer of 1 (0) into an appropriate side type.
@@ -91,3 +102,7 @@ def side_to_string(side: int) -> str:
 	assert side in (0, 1), f'{side} is not a valid side input.'
 	return 'bid' if side else 'ask'
 
+
+def side_orderbook_type_to_string(orderbook_type):
+	assert orderbook_type in (orderbook.OrderSide.BID, orderbook.OrderSide.ASK), f'{orderbook_type} is not a valid side input.'
+	return 'bid' if orderbook_type == orderbook.OrderSide.BID else 'ask'

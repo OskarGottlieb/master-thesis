@@ -46,3 +46,10 @@ def test_converting_order_into_dictionary(basic_regulator):
 		}
 	}
 	assert order_dictionary == expected_dictionary
+
+
+def test_getting_orders_to_be_cleared(basic_regulator, orderbook_with_higher_bid_than_ask, empty_orderbook):
+	basic_regulator.exchanges = {
+		settings.NAMES_OF_EXCHANGES[0]: orderbook_with_higher_bid_than_ask,
+		settings.NAMES_OF_EXCHANGES[1]: empty_orderbook
+	}

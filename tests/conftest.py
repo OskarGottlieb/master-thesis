@@ -64,6 +64,14 @@ def orderbook_with_no_bid_and_best_ask():
 
 
 @pytest.fixture
+def orderbook_with_higher_bid_than_ask():
+	basic_orderbook = orderbook.orderbook.NonUniqueIdOrderBook()
+	basic_orderbook.add_order(**best_bid())
+	basic_orderbook.add_order(**best_ask())
+	return basic_orderbook
+
+
+@pytest.fixture
 def empty_orderbook():
 	return orderbook.orderbook.NonUniqueIdOrderBook()
 	

@@ -23,6 +23,9 @@ class GodResponse(NamedTuple):
 	zero_intelligence_surplus: float
 	marketmaker_surplus: float
 	arbitrageur_profit: float
+	bid_ask_spread_mean: float
+	price_volatility: float
+	price_discovery: float
 
 
 
@@ -35,6 +38,7 @@ class God:
 		self._regulator: modules.regulator.Regulator = modules.regulator.Regulator(
 			national_best_bid_and_offer_delay = settings.NATIONAL_BEST_BID_AND_OFFER_DELAY,
 			asset = self._asset,
+			batch_auction_length = settings.BATCH_AUCTION_LENGTH
 		)
 		self._list_zero_intelligence_traders: List[modules.zerointelligence.ZeroIntelligence] = [
 			modules.zerointelligence.ZeroIntelligence(
@@ -136,15 +140,14 @@ class God:
 			# If the trading is continuous, clear after every agent's (MM/ZI) action.
 			if not self._regulator.batch_auction_length:
 				self._regulator.clear_orders_in_continuous_auction()
-			self._regulator.add_current_exchanges_to_historic_exchanges()
 			self.process_exchange_responses()
+			self._regulator.add_current_exchanges_to_historic_exchanges()
 			self._arbitrageur.do()
+			# If the trading is continuous, we need to clear again after every arbitrageur's action.
 			if not self._regulator.batch_auction_length:
 				self._regulator.clear_orders_in_continuous_auction()
 				self.process_exchange_responses()
-			# for trader_order_pair in list_traders_orders:
-			#	self._all_traders[trader_order_pair.trader_idx].update_position_and_trades(trader_order_pair.order)
-			#	self._all_traders[trader_order_pair.trader_idx].current_orders.remove(trader_order_pair.order)
+
 
 		return GodResponse(
 			mean_execution_time = np.mean(self._regulator.execution_times),
@@ -156,6 +159,9 @@ class God:
 				marketmaker.calculate_total_surplus()
 				for marketmaker in self._market_makers
 			]),
-			arbitrageur_profit = self._arbitrageur.calculate_total_surplus()
+			arbitrageur_profit = self._arbitrageur.calculate_total_surplus(),
+			bid_ask_spread_mean = self._regulator.calculate_mean_of_bid_ask_spread(),
+			price_volatility = 0,
+			price_discovery = 0,
 		)
 
