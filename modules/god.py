@@ -26,6 +26,7 @@ class GodResponse(NamedTuple):
 	bid_ask_spread_mean: float
 	price_volatility: float
 	price_discovery: float
+	number_trades: int
 
 
 
@@ -134,21 +135,22 @@ class God:
 		'''
 		for timestamp, agent in self._summarized_entries.iteritems():
 			self._regulator.current_time = timestamp
-			self._regulator.asset.get_new_value()
+			self._regulator.asset.get_new_value(timestamp)
 			self._regulator.remove_redundant_historic_exchanges()
 			agent.do()
 			# If the trading is continuous, clear after every agent's (MM/ZI) action.
-			if not self._regulator.batch_auction_length:
+			if self._regulator.continuous_trading:
 				self._regulator.clear_orders_in_continuous_auction()
 			self.process_exchange_responses()
 			self._regulator.add_current_exchanges_to_historic_exchanges()
 			self._arbitrageur.do()
 			# If the trading is continuous, we need to clear again after every arbitrageur's action.
-			if not self._regulator.batch_auction_length:
+			if self._regulator.continuous_trading:
 				self._regulator.clear_orders_in_continuous_auction()
 				self.process_exchange_responses()
 
 
+		self._regulator.calculate_sample_price_series()
 		return GodResponse(
 			mean_execution_time = np.mean(self._regulator.execution_times),
 			zero_intelligence_surplus = sum([
@@ -161,7 +163,8 @@ class God:
 			]),
 			arbitrageur_profit = self._arbitrageur.calculate_total_surplus(),
 			bid_ask_spread_mean = self._regulator.calculate_mean_of_bid_ask_spread(),
-			price_volatility = 0,
+			price_volatility = self._regulator.calculate_volatility(),
 			price_discovery = 0,
+			number_trades = self._regulator.total_number_of_trades
 		)
 

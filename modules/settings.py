@@ -26,9 +26,12 @@ SIGMA_ASSET = math.sqrt(5e6)
 NAMES_OF_EXCHANGES = ('New York', 'Chicago')
 NATIONAL_BEST_BID_AND_OFFER_DELAY = 100
 TRADER_TYPES = ('Arbitrageur', 'MarketMaker', 'ZeroIntelligence')
-SESSION_LENGTH = int(12e3)
+SESSION_LENGTH = int(5e3)
 PARAMETERS_SET = os.path.join(os.path.dirname(__file__), '..', 'parameters.csv')
 BATCH_AUCTION_LENGTH = 0
+
+# Sampling
+SAMPLING_PRICE_SERIES = 200
 
 try:
 	from modules.settings_dev import *

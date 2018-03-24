@@ -31,6 +31,7 @@ class Regulator:
 		self.national_best_bid_and_offer_delay = national_best_bid_and_offer_delay
 		self.asset = asset
 		self.batch_auction_length = batch_auction_length
+		self.continuous_trading = False if batch_auction_length else True
 		self.exchanges: Dict[str, orderbook.orderbook.NonUniqueIdOrderBook] = {
 			exchange_name: orderbook.orderbook.NonUniqueIdOrderBook()
 			for exchange_name in settings.NAMES_OF_EXCHANGES
@@ -50,8 +51,8 @@ class Regulator:
 		# Meta will hold information about the trader who is behind the order, as well about the times the order
 		# was added into the orderbook and later executed.
 		self.meta: Dict[order_executed_by_zerointelligence.misc.LimitOrder, Dict[str, Any]] = {}
-		if self.batch_auction_length:
-			self.clearing_times = self.generate_batch_auction_clearing_times(self.batch_auction_length)
+		if not self.continuous_trading:
+			self.clearing_times = self.generate_batch_auction_clearing_times()
 		else: 
 			self.clearing_times = pd.Series()
 		self.add_current_exchanges_to_historic_exchanges()
@@ -61,13 +62,14 @@ class Regulator:
 		self.dict_prices_of_executed_orders: Dict[modules.misc.Order: int] = {}
 		self.clearing_price: Dict[str, int] = {}
 		self.list_market_information: List[modules.misc.MarketInfo] = []
+		self.total_number_of_trades: int = 0
 
 
-	def generate_batch_auction_clearing_times(self, batch_auction_length: int) -> pd.Series:
+	def generate_batch_auction_clearing_times(self) -> pd.Series:
 		'''
 		Batch auction of length 0 means continuous trading.
 		'''
-		entries = list(np.cumsum([batch_auction_length] * int(settings.SESSION_LENGTH / batch_auction_length)))
+		entries = list(np.cumsum([self.batch_auction_length] * int(settings.SESSION_LENGTH / self.batch_auction_length)))
 		return pd.Series(
 			index = entries,
 			data = self			
@@ -104,6 +106,7 @@ class Regulator:
 		if best_price and ((order.side and best_price <= order.limit_price) or (not order.side and best_price >= order.limit_price)):
 			self.logger.info(f'Trader {trader_timestamp.trader_idx} is actively hiting trader\'s {self.meta[limit_order_passive].trader_idx} order on exchange {order.exchange_name} at price {best_price}')			
 			self.meta[limit_order_active] = trader_timestamp
+			self.asset.asset_price_series[self.current_time] = best_price
 			self.dict_prices_of_executed_orders.update(
 				{limit_order_passive: best_price, limit_order_active: best_price}
 			)
@@ -271,6 +274,7 @@ class Regulator:
 			if highest_ask_price and lowest_bid_price:
 				self.clearing_price[exchange_name] = int((highest_ask_price + lowest_bid_price) / 2)
 				self.logger.info(f'The clearing price at {exchange_name} is {self.clearing_price[exchange_name]}.')
+				self.exchange_price_series[exchange_name][self.current_time] = self.clearing_price[exchange_name]
 		return dict_exchanges_orders_to_be_cleared
 
 
@@ -377,6 +381,7 @@ class Regulator:
 				filled_quantity = 1,
 				side = limit_order.side
 			)
+			self.total_number_of_trades += 1
 		trader = self.meta[limit_order]
 		# Only save orders, which have been in the orderbook for more than the length of the batch auction,
 		# as those are the orders which have been in the orderbook as passive quotations.
@@ -389,11 +394,32 @@ class Regulator:
 		}
 
 
+
+
 	def save_market_information(self) -> None:
 		'''
 		Each cycle we save the information which the markets produce, from these we later compute metrics which measure the market's performance.
 		'''
 		pass
+
+
+	def calculate_sample_price_series(self) -> None:
+		'''
+		Calculates price series
+		'''
+		price_series = pd.Series(self.asset.asset_price_series)
+		price_series_index = price_series.index.tolist()
+		price_series.index = [
+			int(np.floor(price_index / settings.SAMPLING_PRICE_SERIES) * settings.SAMPLING_PRICE_SERIES)
+			for price_index in price_series_index
+		]
+		self.resampled_price_series = price_series
+
+
+	def calculate_volatility(self) -> float:
+		return np.mean(np.log(np.std(
+			self.resampled_price_series.groupby(self.resampled_price_series.index).last()
+		)))
 
 
 	def calculate_mean_of_bid_ask_spread(self) -> float:

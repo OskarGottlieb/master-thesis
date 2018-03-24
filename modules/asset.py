@@ -10,22 +10,23 @@ class Asset(object):
 	The asset value is an exogenous variable, which can be pre-generated before the trading takes place.
 	'''
 	def __init__(self, initial_value: decimal.Decimal, mean_reversion_factor: float, sigma):
-		self.value_series: List[int] = [initial_value]
+		self.value_series: Dict[float: int] = {0: initial_value}
 		self.mean_reversion_factor: float = mean_reversion_factor
 		self.sigma: float = sigma
 		self.mean_value: float = None
-		self.last_value: int = self.value_series[-1]
+		self.last_value: int = initial_value
+		self.asset_price_series: Dict[float, int] = {}
 
 
-	def get_new_value(self):
+	def get_new_value(self, timestamp: float):
 		'''
 		We first calculate the value of the mean reversion value process of the asset.
 		For simplicity sake, apart from saving the value_series information, we also calculate the mean and
 		last_value of the value series.
 		'''
 		current_value = max(int(self.last_value * self.mean_reversion_factor \
-						+ np.mean(self.value_series) * (1 - self.mean_reversion_factor) \
+						+ np.mean(list(self.value_series.values())) * (1 - self.mean_reversion_factor) \
 						+ np.random.normal(0, self.sigma, 1)), 0)
-		self.value_series.append(int(current_value))
-		self.mean_value = np.mean(self.value_series)
-		self.last_value = self.value_series[-1]
+		self.value_series.update({timestamp: int(current_value)})
+		self.mean_value = np.mean(list(self.value_series.values()))
+		self.last_value = self.value_series[max(self.value_series)]

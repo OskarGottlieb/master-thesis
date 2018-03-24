@@ -65,10 +65,10 @@ class Trader:
 
 
 	def order_to_trade(self, order: modules.misc.LimitOrder) -> modules.misc.Trade:
-		if self.regulator.batch_auction_length:
-			order_price = self.regulator.clearing_price[order.exchange_name]
-		else:
+		if self.regulator.continuous_trading:
 			order_price = self.regulator.dict_prices_of_executed_orders[order]
+		else:
+			order_price = self.regulator.clearing_price[order.exchange_name]
 		return modules.misc.Trade(
 			side = 1 if order.side == orderbook.OrderSide.BID else 0,
 			price = order_price

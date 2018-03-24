@@ -43,7 +43,7 @@ def main() -> None:
 	while True:
 		parameters_set_id = random.choice(list_ids_to_be_processed)
 		parameters = parameters_dataframe[parameters_dataframe['id'] == parameters_set_id].drop('id', 1)
-		set_parameters_value(parameters)
+		#set_parameters_value(parameters)
 		list_responses = []
 		for i in range(10):
 			GOD = modules.god.God()
