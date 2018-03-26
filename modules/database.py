@@ -20,7 +20,8 @@ CREATE TABLE settings(
 	market_maker_spread_around_asset int,
 	national_best_bid_and_offer_delay int,
 	batch_auction_length int,
-	session_length int
+	session_length int,
+	include_arbitrageur bool
 );
 
 CREATE TABLE response(
@@ -28,7 +29,11 @@ CREATE TABLE response(
 	mean_execution_time real,
 	zero_intelligence_surplus real,
 	marketmaker_surplus real,
-	arbitrageur_profit real
+	arbitrageur_profit real,
+	bid_ask_spread_mean real,
+	price_volatility real,
+	price_discovery real,
+	number_trades int
 );
 '''
 
@@ -46,16 +51,17 @@ password: str = settings.PASSWORD, host: str = settings.SERVER, port: str = sett
 	return conn
 
 
-def fill_parameters_table() -> None:
+def fill_parameters_table(dataframe: pd.DataFrame = pd.DataFrame()) -> None:
 	'''
 	Fills the database settings table with the values which are stored in the csv file.
 	'''
 	connection = connect_database()
 	cursor = connection.cursor()
-	parameters_file = pd.read_csv(settings.PARAMETERS_SET)
-	columns =  ','.join(parameters_file.columns.values)
+	if dataframe.empty:
+		dataframe = pd.read_csv(settings.PARAMETERS_SET)
+	columns =  ','.join(dataframe.columns.values)
 	query = f'INSERT INTO settings ({columns}) VALUES\n'
-	for index, row in parameters_file.iterrows():
+	for index, row in dataframe.iterrows():
 		query += str(tuple(row)) + ',\n'
 	query = query[:-2] + ';'
 	cursor.execute(query)

@@ -20,7 +20,7 @@ class Arbitrageur(modules.trader.Trader):
 		If the condition of ask being below the bid is fulfilled, the Arbitrageur trades.
 		In 
 		'''
-		if self.regulator.batch_auction_length and (self.last_entry > self.regulator.last_clearing_time):
+		if not self.regulator.continuous_trading and (self.last_entry > self.regulator.last_clearing_time):
 			return
 		national_best_bid_and_offer = self.get_accurate_national_best_bid_and_offer(
 			current_orders = self.current_orders,

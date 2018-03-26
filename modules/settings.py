@@ -26,12 +26,33 @@ SIGMA_ASSET = math.sqrt(5e6)
 NAMES_OF_EXCHANGES = ('New York', 'Chicago')
 NATIONAL_BEST_BID_AND_OFFER_DELAY = 100
 TRADER_TYPES = ('Arbitrageur', 'MarketMaker', 'ZeroIntelligence')
-SESSION_LENGTH = int(5e3)
+SESSION_LENGTH = int(1e3)
 PARAMETERS_SET = os.path.join(os.path.dirname(__file__), '..', 'parameters.csv')
 BATCH_AUCTION_LENGTH = 0
+INCLUDE_ARBITRAGEUR = False
 
 # Sampling
 SAMPLING_PRICE_SERIES = 200
+PRELIMINARY_ANALYSIS_COUNT = 500
+INSERT_INTO_DATABASE_FREQUENCY = 10
+
+# Preliminary analysis
+BASE_DICTIONARY = {
+    'zero_intelligence_count': [200],
+    'zero_intelligence_intensity': [0.005],
+    'zero_intelligence_shading_min': [0],
+    'zero_intelligence_shading_max': [0],
+    'market_maker_count': [2],
+    'market_maker_intensity': [0.0005],
+    'market_maker_number_orders': [5],
+    'market_maker_number_of_ticks_between_orders': [100],
+    'market_maker_spread_around_asset': [250],
+    'national_best_bid_and_offer_delay': [0],
+    'batch_auction_length': [0],
+    'session_length': [int(10e3)],
+    'include_arbitrageur': [False]
+}
+
 
 try:
 	from modules.settings_dev import *

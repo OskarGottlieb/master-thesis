@@ -17,7 +17,7 @@ import modules.zerointelligence
 
 class GodResponse(NamedTuple):
 	'''
-	God response gives us metrics which we then use to 
+	God response gives us metrics which we then use to measure the market performance.
 	'''
 	mean_execution_time: float
 	zero_intelligence_surplus: float
@@ -41,24 +41,26 @@ class God:
 			asset = self._asset,
 			batch_auction_length = settings.BATCH_AUCTION_LENGTH
 		)
+		self.generate_random_exchange_assignments()
 		self._list_zero_intelligence_traders: List[modules.zerointelligence.ZeroIntelligence] = [
 			modules.zerointelligence.ZeroIntelligence(
 				quantity_max = settings.QUANTITY_MAX,
 				shading_min = settings.SHADING_MIN,
 				shading_max = settings.SHADING_MAX,
 				regulator = self._regulator,
-				default_exchange = random.choice(list(self._regulator.exchanges.keys())),
+				default_exchange = self.exchanges_zerointelligence[i],
 			) for i in range(settings.ZERO_INTELLIGENCE_COUNT)
 		]
 		self._market_makers: List[modules.marketmaker.MarketMaker] = [
 			modules.marketmaker.MarketMaker(
 				regulator = self._regulator,
-				exchange_name = random.choice(list(self._regulator.exchanges.keys())),
+				exchange_name = self.exchanges_marketmaker[i],
 				number_of_orders = settings.MARKET_MAKER_NUMBER_ORDERS,
 				ticks_between_orders = settings.MARKET_MAKER_NUMBER_OF_TICKS_BETWEEN_ORDERS,
 				spread_around_asset = settings.MARKET_MAKER_SPREAD_AROUND_ASSET,
 			) for i in range(settings.MARKET_MAKERS_COUNT)
 		]
+		self.include_arbitrageur = settings.INCLUDE_ARBITRAGEUR
 		self._arbitrageur = modules.arbitrageur.Arbitrageur(regulator = self._regulator)
 		self._summarized_entries: pd.Series = pd.Series()
 		self.summarize_entries()
@@ -67,6 +69,21 @@ class God:
 			trader._idx: trader for trader in self._list_zero_intelligence_traders + self._market_makers + [self._arbitrageur]
 		}
 		self.logger = logwood.get_logger(f'{self.__class__.__name__}')
+
+
+	def generate_random_exchange_assignments(self) -> None:
+		'''
+		The assignment of traders to exchanges is not purely random, we need to assign the two exchanges in equal proportions.
+		'''
+		self.exchanges_zerointelligence, self.exchanges_marketmaker = [], [] 
+		for exchange_name in self._regulator.exchanges:
+			for i in range(int(settings.ZERO_INTELLIGENCE_COUNT / 2)):
+				self.exchanges_zerointelligence.append(exchange_name)
+			for i in range(int(settings.MARKET_MAKERS_COUNT / 2)):
+				self.exchanges_marketmaker.append(exchange_name)
+		
+		random.shuffle(self.exchanges_zerointelligence)
+		random.shuffle(self.exchanges_marketmaker)
 
 
 	def generate_entries(self, traders_list: List[Any],	intensity_of_poisson_process: float, traders_count: int) -> pd.Series:
@@ -143,11 +160,13 @@ class God:
 				self._regulator.clear_orders_in_continuous_auction()
 			self.process_exchange_responses()
 			self._regulator.add_current_exchanges_to_historic_exchanges()
-			self._arbitrageur.do()
+			if self.include_arbitrageur:
+				self._arbitrageur.do()
 			# If the trading is continuous, we need to clear again after every arbitrageur's action.
 			if self._regulator.continuous_trading:
 				self._regulator.clear_orders_in_continuous_auction()
 				self.process_exchange_responses()
+			self._regulator.save_bid_ask_spread()
 
 
 		self._regulator.calculate_sample_price_series()
@@ -164,7 +183,7 @@ class God:
 			arbitrageur_profit = self._arbitrageur.calculate_total_surplus(),
 			bid_ask_spread_mean = self._regulator.calculate_mean_of_bid_ask_spread(),
 			price_volatility = self._regulator.calculate_volatility(),
-			price_discovery = 0,
+			price_discovery = self._regulator.calculate_price_discovery(),
 			number_trades = self._regulator.total_number_of_trades
 		)
 

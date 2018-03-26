@@ -61,8 +61,8 @@ class Regulator:
 		self.dict_regulator_responses_executions: Dict[modules.misc.Order: modules.misc.TraderTimestamp] = {}
 		self.dict_prices_of_executed_orders: Dict[modules.misc.Order: int] = {}
 		self.clearing_price: Dict[str, int] = {}
-		self.list_market_information: List[modules.misc.MarketInfo] = []
 		self.total_number_of_trades: int = 0
+		self.bid_ask_spreads: List[int] = []
 
 
 	def generate_batch_auction_clearing_times(self) -> pd.Series:
@@ -394,15 +394,6 @@ class Regulator:
 		}
 
 
-
-
-	def save_market_information(self) -> None:
-		'''
-		Each cycle we save the information which the markets produce, from these we later compute metrics which measure the market's performance.
-		'''
-		pass
-
-
 	def calculate_sample_price_series(self) -> None:
 		'''
 		Calculates price series
@@ -422,9 +413,24 @@ class Regulator:
 		)))
 
 
-	def calculate_mean_of_bid_ask_spread(self) -> float:
-		pass
+	def calculate_price_discovery(self) -> float:
+		'''
+		Calculates the RMSD between prices and values series, only if price series are present.
+		We do not resample here in any way, we use all points possible.
+		'''
+		prices_values = pd.concat([
+			pd.Series(self.asset.value_series), pd.Series(self.asset.asset_price_series)
+		], axis = 1).dropna()
+		return np.sqrt(np.mean(np.square(prices_values[0] - prices_values[1])))
 
 
 	def calculate_mean_of_bid_ask_spread(self) -> float:
-		pass
+		return np.mean(self.bid_ask_spreads)
+
+
+	def save_bid_ask_spread(self) -> None:
+		for exchange in self.exchanges.values():
+			try:
+				self.bid_ask_spreads.append(exchange.get_spread())
+			except orderbook.exceptions.OrderSideEmpty:
+				pass

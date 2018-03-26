@@ -78,17 +78,6 @@ class TraderTimestamp(NamedTuple):
 
 
 
-class MarketInfo(NamedTuple):
-	'''
-	Market info keeps track of market generated information which we will analyze in the end of the simulation.
-	'''
-	timestamp: float
-	bid_ask_spread_mean: float
-	asset_price: float
-	asset_value: float
-
-
-
 def side_to_orderbook_type(side: int):
 	'''
 	Converts the integer of 1 (0) into an appropriate side type.
