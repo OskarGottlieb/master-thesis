@@ -52,13 +52,13 @@ class Analyzer:
 		dictionary = dict(self.base_dicitonary)
 		dictionary['zero_intelligence_shading_max'] = list(range(0, 1000, 100))
 		self.list_parameters_sets.append(self.expand_grid(dictionary))
-
+		
 
 	def market_makers_count(self) -> None:
 		dictionary = dict(self.base_dicitonary)
 		dictionary['market_maker_count'] = [0, 2, 4]
 		self.list_parameters_sets.append(self.expand_grid(dictionary))
-	
+			
 
 	def market_makers_attributes(self) -> None:
 		dictionary = dict(self.base_dicitonary)
@@ -67,31 +67,31 @@ class Analyzer:
 		dictionary['market_maker_spread_around_asset'] = [0, 2, 4]
 		dictionary['market_maker_number_orders'] = [2, 5, 10]
 		self.list_parameters_sets.append(self.expand_grid(dictionary))
-	
+			
 
 	def different_session_length(self) -> None:
 		dictionary = dict(self.base_dicitonary)
 		dictionary['session_length'] = [int(1e3), int(5e3), int(10e3)]
 		self.list_parameters_sets.append(self.expand_grid(dictionary))
-
+		
 
 	def arbitrageur_presence_no_arbitrage(self) -> None:
 		dictionary = dict(self.base_dicitonary)
 		dictionary['include_arbitrageur'] = [True, False]
 		self.list_parameters_sets.append(self.expand_grid(dictionary))
-
+		
 
 	def lagged_nbbo_without_arbitrageur(self) -> None:
 		dictionary = dict(self.base_dicitonary)
 		dictionary['national_best_bid_and_offer_delay'] = list(range(0, 1000, 100))
 		self.list_parameters_sets.append(self.expand_grid(dictionary))
-
+		
 
 	def batch_auction_without_lag(self) -> None:
 		dictionary = dict(self.base_dicitonary)
 		dictionary['batch_auction_length'] = list(range(0, 1000, 100))
 		self.list_parameters_sets.append(self.expand_grid(dictionary))
-
+		
 
 	def batch_auction_with_lag(self) -> None:
 		dictionary = dict(self.base_dicitonary)
@@ -99,14 +99,14 @@ class Analyzer:
 		dictionary['batch_auction_length'] = list(range(0, 1000, 100))
 		dictionary['include_arbitrageur'] = [True, False]
 		self.list_parameters_sets.append(self.expand_grid(dictionary))
-
+		
 
 	def lagged_nbbo_without_arbitrageur_continuous(self) -> None:
 		dictionary = dict(self.base_dicitonary)
 		dictionary['national_best_bid_and_offer_delay'] = list(range(0, 1000, 100))
 		dictionary['batch_auction_length'] = list(range(0, 1000, 100))
 		self.list_parameters_sets.append(self.expand_grid(dictionary))
-
+		
 
 	def fill_database_with_parameters_sets(self) -> None:
 		for parameter_set in self.list_parameters_sets:

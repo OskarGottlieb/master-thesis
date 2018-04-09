@@ -1,4 +1,4 @@
-from typing import Any, List
+from typing import Any, List, Optional, Tuple
 import os
 import pandas as pd
 import psycopg2
@@ -7,6 +7,16 @@ import psycopg2
 import modules.settings as settings
 
 '''
+CREATE TABLE experiment(
+	id SERIAL PRIMARY KEY,
+	name varchar
+);
+
+CREATE TABLE experiment_content(
+	experiment_id int REFERENCES experiment(id),
+	settings_id int REFERENCES settings(id)
+);
+
 CREATE TABLE settings(
 	id SERIAL PRIMARY KEY,
 	zero_intelligence_count int,
@@ -70,7 +80,7 @@ def fill_parameters_table(dataframe: pd.DataFrame = pd.DataFrame()) -> None:
 	connection.close()
 
 
-def insert_new_results(parameters_set_id:int, list_responses: List[Any]) -> None:
+def insert_new_results(parameters_set_id: int, list_responses: List[Any]) -> None:
 	connection = connect_database()
 	cursor = connection.cursor()
 	query = 'INSERT INTO response VALUES \n'
@@ -84,17 +94,63 @@ def insert_new_results(parameters_set_id:int, list_responses: List[Any]) -> None
 	connection.close()
 
 
-def get_parameters_table() -> None:
+def execute_query(query: str) -> Optional[List[Tuple[Any]]]:
 	'''
 	Gets the database settings table.
 	'''
 	connection = connect_database()
 	cursor = connection.cursor()
-	query = f'SELECT * from settings'
 	cursor.execute(query)
-	settings_table = cursor.fetchall()
-	# connection.commit()
+	query_result = pd.DataFrame(
+		cursor.fetchall(),
+		columns = [description[0] for description in cursor.description]
+	)
 	cursor.close()
 	connection.close()
 
-	return settings_table
+	return query_result
+
+
+def get_settings_count(unique: bool = False) -> None:
+	'''
+	Gets the database settings table.
+	'''
+	query_result = execute_query(f'''
+		SELECT settings.id, (
+			select count(*)
+			from response
+			where response.settings_id = settings.id
+		) as response_count 
+		from settings;
+	''')
+	query_result_dataframe = pd.DataFrame(query_result, columns = ('settings_id', 'response_count'))
+	if unique:
+		pass 
+	return None
+
+
+def aggregate_settings() -> None:
+	'''
+	Gets the database settings table.
+	'''
+	query_result = execute_query(f'''
+		SELECT settings.id,
+		from settings
+		group by
+			zero_intelligence_count,
+			zero_intelligence_intensity,
+			zero_intelligence_shading_min,
+			zero_intelligence_shading_max,
+			market_maker_count,
+			market_maker_intensity,
+			market_maker_number_orders,
+			market_maker_number_of_ticks_between_orders,
+			market_maker_spread_around_asset,
+			national_best_bid_and_offer_delay,
+			batch_auction_length,
+			session_length,
+			include_arbitrageur
+	''')
+	
+	return pd.DataFrame(query_result, columns = ('settings_id', 'response_count'))
+	

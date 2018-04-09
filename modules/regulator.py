@@ -274,7 +274,7 @@ class Regulator:
 			if highest_ask_price and lowest_bid_price:
 				self.clearing_price[exchange_name] = int((highest_ask_price + lowest_bid_price) / 2)
 				self.logger.info(f'The clearing price at {exchange_name} is {self.clearing_price[exchange_name]}.')
-				self.exchange_price_series[exchange_name][self.current_time] = self.clearing_price[exchange_name]
+				self.asset.asset_price_series[self.current_time] = self.clearing_price[exchange_name]
 		return dict_exchanges_orders_to_be_cleared
 
 

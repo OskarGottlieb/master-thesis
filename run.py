@@ -37,25 +37,25 @@ def main() -> None:
 	After the simulation, we save the 10 results and continue with the simulation.
 	'''
 	parameters_table = pd.DataFrame(
-		modules.database.get_parameters_table(),
+		modules.database.execute_query('SELECT * from settings;'),
 		columns = ['id'] + list(settings.BASE_DICTIONARY.keys())
 	)
-	for index, row in parameters_table.iterrows():
-		current_parameters_id = row.pop('id')
-		parameters = row.to_dict()
-		set_parameters_value(parameters = parameters)
-		
+	while True:
+		settings_count = modules.database.get_settings_count()
+		settings_count = settings_count[settings_count['response_count'] < settings.PRELIMINARY_ANALYSIS_COUNT]
+		settings_id = random.choice(settings_count['settings_id'])
+		parameters = parameters_table[parameters_table['id'] == settings_id]
 		list_responses = []
-		for i in range(1, settings.PRELIMINARY_ANALYSIS_COUNT + 1):
+		current_parameters_id = int(parameters.pop('id').iloc[0])
+		for i in range(10):
+			set_parameters_value(parameters = parameters)
 			GOD = modules.god.God()
 			list_responses.append(GOD.run_simulation())
 			print(list_responses[-1])
-			if i % settings.INSERT_INTO_DATABASE_FREQUENCY == 0:
-				modules.database.insert_new_results(
-					parameters_set_id = current_parameters_id,
-				 	list_responses = list_responses
-				)
-				list_responses = []
+		modules.database.insert_new_results(
+			parameters_set_id = current_parameters_id,
+		 	list_responses = list_responses
+		)
 
 
 if __name__ == '__main__':
@@ -63,7 +63,6 @@ if __name__ == '__main__':
 		if sys.argv[1] == 'analyze':
 			analyzer = modules.analyzer.Analyzer()
 	else:
-		main()
 		for process in range(4):
 			process = multiprocessing.Process(target = main)
 			process.start()

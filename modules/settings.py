@@ -44,8 +44,8 @@ BASE_DICTIONARY = {
     'zero_intelligence_shading_max': [0],
     'market_maker_count': [2],
     'market_maker_intensity': [0.0005],
-    'market_maker_number_orders': [5],
     'market_maker_number_of_ticks_between_orders': [100],
+    'market_maker_number_orders': [5],
     'market_maker_spread_around_asset': [250],
     'national_best_bid_and_offer_delay': [0],
     'batch_auction_length': [0],
@@ -53,6 +53,9 @@ BASE_DICTIONARY = {
     'include_arbitrageur': [False]
 }
 
+#OTHER
+PLOTLY_USERNAME = ''
+PLOTLY_PASSWORD = ''
 
 try:
 	from modules.settings_dev import *
