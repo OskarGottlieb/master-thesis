@@ -36,6 +36,7 @@ def main() -> None:
 	We get the set of parameters from which we select some set and we simulate it 10 times.
 	After the simulation, we save the 10 results and continue with the simulation.
 	'''
+	logger = logwood.get_logger('main')
 	parameters_table = pd.DataFrame(
 		modules.database.execute_query('SELECT * from settings;'),
 		columns = ['id'] + list(settings.BASE_DICTIONARY.keys())
@@ -47,11 +48,11 @@ def main() -> None:
 		parameters = parameters_table[parameters_table['id'] == settings_id]
 		list_responses = []
 		current_parameters_id = int(parameters.pop('id').iloc[0])
+		set_parameters_value(parameters = parameters)
 		for i in range(10):
-			set_parameters_value(parameters = parameters)
 			GOD = modules.god.God()
 			list_responses.append(GOD.run_simulation())
-			print(list_responses[-1])
+			logger.warning(list_responses[-1])
 		modules.database.insert_new_results(
 			parameters_set_id = current_parameters_id,
 		 	list_responses = list_responses
@@ -63,6 +64,7 @@ if __name__ == '__main__':
 		if sys.argv[1] == 'analyze':
 			analyzer = modules.analyzer.Analyzer()
 	else:
-		for process in range(4):
+		main()
+		for process in range(2):
 			process = multiprocessing.Process(target = main)
 			process.start()

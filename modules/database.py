@@ -111,22 +111,21 @@ def execute_query(query: str) -> Optional[List[Tuple[Any]]]:
 	return query_result
 
 
-def get_settings_count(unique: bool = False) -> None:
+def get_settings_count(unique: bool = False) -> pd.DataFrame:
 	'''
 	Gets the database settings table.
 	'''
 	query_result = execute_query(f'''
-		SELECT settings.id, (
+		SELECT settings.id as settings_id, (
 			select count(*)
 			from response
 			where response.settings_id = settings.id
 		) as response_count 
 		from settings;
 	''')
-	query_result_dataframe = pd.DataFrame(query_result, columns = ('settings_id', 'response_count'))
 	if unique:
 		pass 
-	return None
+	return query_result
 
 
 def aggregate_settings() -> None:

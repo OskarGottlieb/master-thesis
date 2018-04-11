@@ -196,14 +196,15 @@ class Regulator:
 		'''
 		self.last_clearing_time = self.current_time
 		orders_dataframe = self.generate_orders_dataframe()
-		self.add_batch_of_orders_into_orderbook(orders_dataframe)
+		if not orders_dataframe.empty:
+			self.add_batch_of_orders_into_orderbook(orders_dataframe)
 		dict_exchanges_orders_to_be_cleared = self.get_orders_to_be_cleared()
 		if dict_exchanges_orders_to_be_cleared:
 			self.clear_orders_in_batch_auction(dict_exchanges_orders_to_be_cleared)
 			self.logger.info('Cleared the market in a batch auction.')
 
 
-	def generate_orders_dataframe(self) -> Optional[pd.DataFrame]:
+	def generate_orders_dataframe(self) -> pd.DataFrame:
 		if self.dict_orders_to_be_processed:
 			list_of_dict_orders: List[Dict[str, Any]] = []
 			for order, trader_timestamp in self.dict_orders_to_be_processed.items():
@@ -215,8 +216,9 @@ class Regulator:
 			orders_dataframe.sort_values(['side', 'limit_price', 'random_seed'], inplace = True)
 			del orders_dataframe['random_seed']
 			self.dict_orders_to_be_processed = {}
+			orders_dataframe.to_pickle('orders_dataframe.p')
 			return self.filter_orders_dataframe_by_highest_timestamp(orders_dataframe)
-		return None
+		return pd.DataFrame()
 
 
 	@staticmethod
@@ -226,12 +228,8 @@ class Regulator:
 		It is the same as if he deleted the order every time he submitted a new one.
 		'''
 		max_timestamp_per_trader = orders_dataframe.groupby('trader_idx')['timestamp'].max().reset_index()
-		max_timestamp_per_trader['is_maximum_timestamp'] = True
-		orders_dataframe = orders_dataframe.join(max_timestamp_per_trader['is_maximum_timestamp'])
-		orders_dataframe['is_maximum_timestamp'] = orders_dataframe['is_maximum_timestamp'].fillna(False)
-		orders_dataframe = orders_dataframe[orders_dataframe['is_maximum_timestamp']]
-		del orders_dataframe['is_maximum_timestamp']
-		return orders_dataframe
+		return orders_dataframe.merge(max_timestamp_per_trader, 'inner', ['trader_idx','timestamp'])
+
 
 
 	def add_batch_of_orders_into_orderbook(self, orders_dataframe: pd.DataFrame) -> None:
@@ -331,6 +329,7 @@ class Regulator:
 				)
 
 		self.dict_orders_to_be_processed = {}
+
 
 	def increase_last_order_idx(self, side: str) -> int:
 		'''

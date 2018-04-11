@@ -5,6 +5,7 @@ import pandas as pd
 import logwood
 import orderbook
 import random
+import sys
 
 import modules.asset
 import modules.arbitrageur
@@ -106,16 +107,18 @@ class God:
 		Creates two pandas Series out of the two trader types which arrive according to their own poisson process.
 		It then merges the two series and sorts them by the index.
 		'''
+		market_maker_entries = pd.Series()
 		zero_intelligence_entries = self.generate_entries(
 			traders_list = self._list_zero_intelligence_traders,
 			traders_count = settings.ZERO_INTELLIGENCE_COUNT,
 			intensity_of_poisson_process = settings.INTENSITY_ZERO_INTELLIGENCE,
 		)
-		market_maker_entries = self.generate_entries(
-			traders_list = self._market_makers,
-			traders_count = settings.MARKET_MAKERS_COUNT,
-			intensity_of_poisson_process = settings.INTENSITY_MARKET_MAKER,
-		)
+		if settings.MARKET_MAKERS_COUNT:
+			market_maker_entries = self.generate_entries(
+				traders_list = self._market_makers,
+				traders_count = settings.MARKET_MAKERS_COUNT,
+				intensity_of_poisson_process = settings.INTENSITY_MARKET_MAKER,
+			)
 		self._summarized_entries = pd.concat([zero_intelligence_entries, market_maker_entries, self._regulator.clearing_times]).sort_index()
 
 
@@ -124,22 +127,27 @@ class God:
 		The wrapper module takes regulator's both dictionaries with responses of additions and executions and processes them
 		by assigning the Orders to respective traders. The orders have already been executed on the respecitve exchange.
 		'''
-		if self._regulator.dict_regulator_responses_additions:
-			for order in self._regulator.dict_regulator_responses_additions:
-				self.logger.info(f'Processing \'A\' {order} by trader {self._regulator.meta[order].trader_idx}')
-				self._all_traders[self._regulator.dict_regulator_responses_additions[order].trader_idx].current_orders.append(order)
 		if self._regulator.dict_regulator_responses_executions:
 			for order in self._regulator.dict_regulator_responses_executions:
 				self.logger.info(
 					f'''
-						Executing {order} of {self._all_traders[self._regulator.meta
-						[order].trader_idx].__class__.__name__} {self._regulator.meta[order].trader_idx}
+						Executing {order} of {self._all_traders[
+							self._regulator.meta[order].trader_idx].__class__.__name__
+						} {self._regulator.meta[order].trader_idx}
 					'''
 				)
 				trader = self._all_traders[self._regulator.dict_regulator_responses_executions[order].trader_idx]
 				trader.update_position_and_trades(
 		 			order = order
 				)
+		if self._regulator.dict_regulator_responses_additions:
+			for order in self._regulator.dict_regulator_responses_additions:
+				self.logger.info(f'Processing \'A\' {order} by trader {self._regulator.meta[order].trader_idx}')
+				trader = self._all_traders[self._regulator.dict_regulator_responses_additions[order].trader_idx]
+				trader.current_orders.append(order)
+				if self.__class__.__name__ == 'ZeroIntelligence':
+					if len(trader.current_orders) > 0:
+						sys.exit(1)
 
 		self._regulator.reset_regulator_information()
 
@@ -152,6 +160,7 @@ class God:
 		'''
 		for timestamp, agent in self._summarized_entries.iteritems():
 			self._regulator.current_time = timestamp
+			self.logger.info(f'The time is {self._regulator.current_time}.')
 			self._regulator.asset.get_new_value(timestamp)
 			self._regulator.remove_redundant_historic_exchanges()
 			agent.do()
